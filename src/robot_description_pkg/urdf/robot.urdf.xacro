@@ -1,0 +1,74 @@
+<?xml version="1.0"?>
+<!--
+  ============================================================================
+  robot_description_pkg/urdf/robot.urdf.xacro
+  ====
+  PURPOSE : Top-level entry point.  This is the ONLY file that launch scripts
+            and xacro processors should reference directly.  It wires together
+            every sub-module and exposes the robot to ROS 2 / Gazebo.
+
+  USAGE (CLI):
+    xacro robot.urdf.xacro > /tmp/robot.urdf
+    check_urdf /tmp/robot.urdf
+
+  USAGE (launch):
+    robot_description = xacro.process_file(
+        get_package_share_directory('robot_description_pkg')
+        + '/urdf/robot.urdf.xacro'
+    ).toxml()
+
+  AUTHOR  : Robotics Engineering Team
+  ROS     : ROS 2 Humble / Iron
+  STD     : REP-103, REP-105, REP-120
+  ============================================================================
+-->
+<robot name="delivery_robot"
+       xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <!-- ========================================================================
+       SECTION 1 – SHARED UTILITIES
+       Always loaded first; every subsequent file depends on these macros.
+       ======================================================================== -->
+  <xacro:include filename="$(find robot_description_pkg)/urdf/materials.xacro"/>
+  <xacro:include filename="$(find robot_description_pkg)/urdf/inertia_macros.xacro"/>
+
+  <!-- ========================================================================
+       SECTION 2 – ROBOT MODULES
+       Order matters: base → wheels → sensors → gazebo plugins.
+       Each module only uses properties/macros declared before it.
+       ======================================================================== -->
+
+  <!-- 2.1  Chassis, body column, shelves, head -->
+  <xacro:include filename="$(find robot_description_pkg)/urdf/base.xacro"/>
+
+  <!-- 2.2  Drive wheels + passive casters (uses base geometry properties) -->
+  <xacro:include filename="$(find robot_description_pkg)/urdf/wheels.xacro"/>
+
+  <!-- 2.3  All sensor links, joints, optical frames -->
+  <xacro:include filename="$(find robot_description_pkg)/urdf/sensors.xacro"/>
+
+  <!-- 2.4  Gazebo physics overrides + ROS 2 plugin declarations -->
+  <xacro:include filename="$(find robot_description_pkg)/gazebo/gazebo_plugins.xacro"/>
+
+  <!-- ========================================================================
+       SECTION 3 – ROBOT-LEVEL GAZEBO PROPERTIES
+       Properties that apply to the whole robot (not a single link/sensor).
+       ======================================================================== -->
+
+  <!--
+    Self-collision:  disabled by default (performance). Enable per-link in
+    simulation CI if contact-aware planning is required.
+  -->
+  <gazebo>
+    <self_collide>0</self_collide>
+  </gazebo>
+
+  <!--
+    Static flag:  must be false for a mobile robot.
+    Flip to true ONLY for static mesh visualisation tests.
+  -->
+  <gazebo>
+    <static>false</static>
+  </gazebo>
+
+</robot>

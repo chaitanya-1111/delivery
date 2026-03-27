@@ -1,0 +1,243 @@
+// ============================================================
+//  robot_motor_firmware.ino
+//  Restaurant Delivery Robot — Arduino Motor Controller
+//
+//  Hardware:
+//    - Cytron 10A Motor Driver (PWM + DIR per channel)
+//    - 2x DC Geared Motors with Magnetic Quadrature Encoders
+//    - 13 PPR encoder × 4 (quadrature) × 71 (gear ratio) = 3692 CPR
+//
+//  Serial Protocol (USB @ 115200 baud):
+//    ROS → Arduino:  "M <left_pwm> <right_pwm>\n"
+//                    pwm range: -255 (full reverse) to 255 (full forward)
+//    Arduino → ROS:  "E <left_ticks> <right_ticks>\n"
+//                    sent every ODOM_INTERVAL_MS milliseconds
+//
+//  Safety:
+//    - Motors stop automatically if no command received within WATCHDOG_MS
+// ============================================================
+
+// ── Pin Definitions ──────────────────────────────────────────
+
+// Left Motor — Cytron PWM + DIR
+const int LEFT_PWM_PIN  = 5;   // PWM capable pin
+const int LEFT_DIR_PIN  = 4;   // Direction
+
+// Right Motor — Cytron PWM + DIR
+const int RIGHT_PWM_PIN = 6;   // PWM capable pin
+const int RIGHT_DIR_PIN = 7;   // Direction
+
+// Left Encoder — must use interrupt-capable pins
+const int LEFT_ENC_A  = 2;     // Interrupt pin
+const int LEFT_ENC_B  = 8;
+
+// Right Encoder — must use interrupt-capable pins
+const int RIGHT_ENC_A = 3;     // Interrupt pin
+const int RIGHT_ENC_B = 9;
+
+// ── Tuning Constants ─────────────────────────────────────────
+
+const unsigned long ODOM_INTERVAL_MS = 20;    // Publish encoder ticks every 20 ms (50 Hz)
+const unsigned long WATCHDOG_MS      = 500;   // Stop motors if no command for 500 ms
+const int           MAX_PWM          = 255;   // Arduino analogWrite ceiling
+
+// ── Encoder State (volatile — modified in ISR) ───────────────
+
+volatile long leftTicks  = 0;
+volatile long rightTicks = 0;
+
+// Track previous A-channel state for quadrature decoding
+volatile int leftEncBLast  = LOW;
+volatile int rightEncBLast = LOW;
+
+// ── Timing ───────────────────────────────────────────────────
+
+unsigned long lastOdomTime    = 0;
+unsigned long lastCommandTime = 0;
+
+// ── Serial Buffer ─────────────────────────────────────────────
+
+const int  SERIAL_BUF_SIZE = 32;
+char       serialBuf[SERIAL_BUF_SIZE];
+int        serialBufIdx = 0;
+
+// ============================================================
+//  INTERRUPT SERVICE ROUTINES — Quadrature Decoder
+// ============================================================
+
+void leftEncoderISR() {
+  // Read B channel to determine direction
+  if (digitalRead(LEFT_ENC_B) == HIGH) {
+    leftTicks++;
+  } else {
+    leftTicks--;
+  }
+}
+
+void rightEncoderISR() {
+  // Right motor is physically mirrored — invert sign so
+  // forward motion gives positive ticks on both sides
+  if (digitalRead(RIGHT_ENC_B) == HIGH) {
+    rightTicks--;
+  } else {
+    rightTicks++;
+  }
+}
+
+// ============================================================
+//  MOTOR CONTROL
+// ============================================================
+
+/**
+ * Drive a single Cytron channel.
+ * @param pwmPin   PWM output pin
+ * @param dirPin   Direction output pin
+ * @param speed    -255 (full reverse) … +255 (full forward)
+ */
+void setMotor(int pwmPin, int dirPin, int speed) {
+  speed = constrain(speed, -MAX_PWM, MAX_PWM);
+
+  if (speed >= 0) {
+    digitalWrite(dirPin, HIGH);         // Forward
+    analogWrite(pwmPin, speed);
+  } else {
+    digitalWrite(dirPin, LOW);          // Reverse
+    analogWrite(pwmPin, -speed);
+  }
+}
+
+void stopMotors() {
+  analogWrite(LEFT_PWM_PIN,  0);
+  analogWrite(RIGHT_PWM_PIN, 0);
+}
+
+// ============================================================
+//  SERIAL COMMAND PARSER
+// ============================================================
+
+/**
+ * Process a complete line from ROS.
+ * Expected format:  "M <left_pwm> <right_pwm>"
+ */
+void processCommand(const char* line) {
+  if (line[0] == 'M') {
+    int lPwm = 0, rPwm = 0;
+    if (sscanf(line + 1, " %d %d", &lPwm, &rPwm) == 2) {
+      setMotor(LEFT_PWM_PIN,  LEFT_DIR_PIN,  lPwm);
+      setMotor(RIGHT_PWM_PIN, RIGHT_DIR_PIN, rPwm);
+      lastCommandTime = millis();
+    }
+  }
+  // Future commands can be added here:
+  // 'S' — stop immediately
+  // 'R' — reset encoder ticks
+}
+
+// ============================================================
+//  SETUP
+// ============================================================
+
+void setup() {
+  // Motor driver pins
+  pinMode(LEFT_PWM_PIN,  OUTPUT);
+  pinMode(LEFT_DIR_PIN,  OUTPUT);
+  pinMode(RIGHT_PWM_PIN, OUTPUT);
+  pinMode(RIGHT_DIR_PIN, OUTPUT);
+
+  // Encoder pins (INPUT_PULLUP avoids floating state)
+  pinMode(LEFT_ENC_A,  INPUT_PULLUP);
+  pinMode(LEFT_ENC_B,  INPUT_PULLUP);
+  pinMode(RIGHT_ENC_A, INPUT_PULLUP);
+  pinMode(RIGHT_ENC_B, INPUT_PULLUP);
+
+  // Attach interrupts on rising edge of channel A
+  attachInterrupt(digitalPinToInterrupt(LEFT_ENC_A),  leftEncoderISR,  RISING);
+  attachInterrupt(digitalPinToInterrupt(RIGHT_ENC_A), rightEncoderISR, RISING);
+
+  stopMotors();
+
+  Serial.begin(115200);
+  // Handshake — ROS node waits for this before sending commands
+  Serial.println("READY");
+
+  lastCommandTime = millis();
+  lastOdomTime    = millis();
+}
+
+// ============================================================
+//  MAIN LOOP
+// ============================================================
+
+void loop() {
+  unsigned long now = millis();
+
+  // ── 1. Read serial bytes and accumulate into line buffer ──
+  while (Serial.available()) {
+    char c = (char)Serial.read();
+
+    if (c == '\n' || c == '\r') {
+      if (serialBufIdx > 0) {
+        serialBuf[serialBufIdx] = '\0';   // Null-terminate
+        processCommand(serialBuf);
+        serialBufIdx = 0;
+      }
+    } else if (serialBufIdx < SERIAL_BUF_SIZE - 1) {
+      serialBuf[serialBufIdx++] = c;
+    }
+  }
+
+  // ── 2. Watchdog — stop if ROS goes silent ─────────────────
+  if ((now - lastCommandTime) > WATCHDOG_MS) {
+    stopMotors();
+  }
+
+  // ── 3. Publish encoder ticks to ROS at fixed rate ─────────
+  if ((now - lastOdomTime) >= ODOM_INTERVAL_MS) {
+    lastOdomTime = now;
+
+    // Atomically snapshot ticks (disable interrupts briefly)
+    noInterrupts();
+    long lTicks = leftTicks;
+    long rTicks = rightTicks;
+    interrupts();
+
+    // Format: "E <left_ticks> <right_ticks>"
+    Serial.print("E ");
+    Serial.print(lTicks);
+    Serial.print(" ");
+    Serial.println(rTicks);
+  }
+}
+
+// ============================================================
+//  WIRING REFERENCE
+// ============================================================
+//
+//  Arduino Uno / Mega → Cytron 10A Driver
+//  ───────────────────────────────────────
+//  Pin 4  (LEFT_DIR_PIN)  → Left  driver DIR  input
+//  Pin 5  (LEFT_PWM_PIN)  → Left  driver PWM  input
+//  Pin 6  (RIGHT_PWM_PIN) → Right driver PWM  input
+//  Pin 7  (RIGHT_DIR_PIN) → Right driver DIR  input
+//  GND                    → Driver GND (shared ground!)
+//
+//  Arduino → Left Encoder
+//  ───────────────────────
+//  Pin 2  (LEFT_ENC_A)  → Encoder A channel  (interrupt)
+//  Pin 8  (LEFT_ENC_B)  → Encoder B channel
+//  5V                   → Encoder VCC
+//  GND                  → Encoder GND
+//
+//  Arduino → Right Encoder
+//  ────────────────────────
+//  Pin 3  (RIGHT_ENC_A) → Encoder A channel  (interrupt)
+//  Pin 9  (RIGHT_ENC_B) → Encoder B channel
+//  5V                   → Encoder VCC
+//  GND                  → Encoder GND
+//
+//  Cytron Driver → Motors
+//  ───────────────────────
+//  Motor+ / Motor-  → Left / Right 24V DC geared motor terminals
+//  Battery+/-       → 24V supply
+//
+// ============================================================
