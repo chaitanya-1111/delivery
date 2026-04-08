@@ -1,0 +1,8 @@
+# ROS 2 Robotics Rules
+- I am using ROS 2 Humble/Iron (specify your version).
+- Always use 'rclcpp' for C++ nodes and 'rclpy' for Python nodes.
+- When creating nodes, prefer using the 'Node' composition pattern (Inheriting from rclcpp::Node).
+- Always include 'package.xml' and 'CMakeLists.txt' or 'setup.py' updates when adding new dependencies.
+- Use standard ROS 2 naming conventions: packages are 'snake_case', nodes are 'snake_case'.
+- For geometry, always prefer 'geometry_msgs'.
+- If I ask to "build," use the command: 'colcon build --symlink-install'.

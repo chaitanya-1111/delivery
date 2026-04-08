@@ -52,6 +52,9 @@ class SessionManagerNode(Node):
         # State Flags
         self.speaking = False
         self.greeting_sent = False
+        # Locks the current face across callbacks so conversation doesn't jump.
+        # `robot_interfaces/FaceBox` has no `tracking_id`, so we lock using a
+        # stable key derived from bounding box fields.
         self.locked_face_id = None
         
         # Non-blocking Timers
@@ -68,14 +71,16 @@ class SessionManagerNode(Node):
 
     def face_cb(self, msg: FaceBox):
         now = time.time()
-        
+
+        current_face_id = self._face_key(msg)
+
         # Lock face on first detection
         if self.locked_face_id is None:
-            self.locked_face_id = msg.tracking_id
+            self.locked_face_id = current_face_id
             self.get_logger().info(f"🔒 Face locked: {self.locked_face_id}")
 
         # Ignore other faces to prevent "Conversation Jumping"
-        if msg.tracking_id != self.locked_face_id:
+        if current_face_id != self.locked_face_id:
             return
 
         self.last_face_time = now
@@ -209,6 +214,26 @@ class SessionManagerNode(Node):
     # ======================================================
     # HELPERS
     # ======================================================
+    def _face_key(self, msg: FaceBox) -> str:
+        """
+        Create a stable identifier from FaceBox fields.
+
+        The face box can jitter frame-to-frame, so we bucket the geometry to
+        tolerate minor motion.
+        """
+        # Bucket sizes: tune if your camera produces larger/smaller jitter.
+        bucket_xy = 40.0
+        bucket_wh = 40.0
+
+        cx = msg.x + (msg.w / 2.0)
+        cy = msg.y + (msg.h / 2.0)
+
+        return (
+            f"cx{int(cx // bucket_xy)}_"
+            f"cy{int(cy // bucket_xy)}_"
+            f"w{int(msg.w // bucket_wh)}_"
+            f"h{int(msg.h // bucket_wh)}"
+        )
 
     # ✅ NEW WAY: Ask the AI Node what to say
     def ask_ai(self, mode, user_text=""):
