@@ -1,0 +1,86 @@
+# ============================================================
+# slam_toolbox_localization.yaml
+#
+# SLAM Toolbox in LOCALIZATION mode.
+#
+# DIFFERENCE FROM MAPPING MODE:
+#   Mapping mode: builds the map, adds new poses to the graph.
+#   Localization mode: map is FIXED. Only the robot's position
+#   within that map is computed. No new map features are added.
+#
+# WHY USE SLAM TOOLBOX FOR LOCALIZATION (vs AMCL):
+#   AMCL (particle filter): good for environments that exactly
+#     match the map. Struggles if furniture has moved.
+#   SLAM Toolbox localization: uses scan-to-map matching which
+#     is more robust to minor environment changes (chairs rearranged,
+#     tables moved, new objects added) — perfect for a restaurant!
+#
+# IN PRODUCTION:
+#   Step 2 SLAM mapping runs ONCE to build the map.
+#   Step 3 Nav2 uses THIS file for ongoing daily localization.
+#   If the restaurant is rearranged significantly, run mapping again.
+# ============================================================
+
+slam_toolbox:
+  ros__parameters:
+
+    # ── Frames ───────────────────────────────────────────────────
+    odom_frame: odom
+    map_frame:  map
+    base_frame: base_footprint
+    scan_topic: /scan
+
+    # ── LOCALIZATION MODE ─────────────────────────────────────────
+    # localization = use the saved serialized pose graph.
+    # The map will NOT grow. Robot position within map is computed.
+    mode: localization
+
+    # Path to the saved pose graph from the mapping session.
+    # This is the .posegraph file, NOT the .yaml map file.
+    # Set at launch time via map_file_name argument.
+    map_file_name: /home/robot/delivery_bot_ws/maps/restaurant_map
+    map_start_at_dock: true    # start at the saved dock position
+
+    # ── Localization Settings ────────────────────────────────────
+    # How far to search for scan-to-map match at startup.
+    # Wider = more robust initial localization but slower startup.
+    # 0.5m is enough if robot always starts at dock/known position.
+    localization_search_radius: 0.5    # meters
+
+    # ── Scan Processing ───────────────────────────────────────────
+    minimum_travel_distance: 0.5
+    minimum_travel_heading:  0.5
+    scan_buffer_size: 10
+    scan_buffer_maximum_scan_distance: 10.0
+
+    # ── Scan Matching ─────────────────────────────────────────────
+    # Stricter than mapping (we trust the existing map).
+    link_match_minimum_response_fine: 0.1
+    link_scan_maximum_distance:       1.5    # narrower than mapping
+    distance_decomposition_radius:    2.0
+
+    # ── NO loop closure in localization mode ──────────────────────
+    # Map is fixed — no optimization needed.
+    do_loop_closing: false
+
+    # ── Solver ────────────────────────────────────────────────────
+    solver_plugin:         solver_plugins::CeresSolver
+    ceres_linear_solver:   SPARSE_NORMAL_CHOLESKY
+    ceres_preconditioner:  SCHUR_JACOBI
+    ceres_trust_strategy:  LEVENBERG_MARQUARDT
+    ceres_dogleg_type:     TRADITIONAL_DOGLEG
+    ceres_loss_function:   None
+
+    # ── TF / Timing ───────────────────────────────────────────────
+    transform_publish_period: 0.02
+    tf_buffer_duration: 30.0
+    map_update_interval:  5.0
+    throttle_scans:       1
+    use_multithread:      true
+    max_laser_range:      8.0
+
+    # ── Interactive mode still on ─────────────────────────────────
+    # Useful for operators to manually correct pose if robot gets lost.
+    enable_interactive_mode: true
+
+    stack_size_to_use: 40000000

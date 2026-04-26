@@ -7,15 +7,10 @@ package_name = 'robot_hardware_pkg'
 setup(
     name=package_name,
     version='1.0.0',
-    # The node modules currently live at the package root
-    # (`hardware_interface_node.py`, `mock_arduino.py`) rather than under a
-    # `robot_hardware_pkg/` Python package directory.
-    # Use `py_modules` so ROS2 can import the entry points correctly.
-    packages=[],
-    py_modules=[
-        'hardware_interface_node',
-        'mock_arduino',
+    packages=[
+        'robot_hardware_pkg',
     ],
+    py_modules=[],
     data_files=[
         ('share/ament_index/resource_index/packages',
             ['resource/' + package_name]),
@@ -31,8 +26,8 @@ setup(
     license='Proprietary',
     entry_points={
         'console_scripts': [
-            'hardware_interface_node = hardware_interface_node:main',
-            'mock_arduino = mock_arduino:main',
+            'hardware_interface_node = robot_hardware_pkg.hardware_interface_node:main',
+            'mock_arduino = robot_hardware_pkg.mock_arduino:main',
         ],
     },
 )

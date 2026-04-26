@@ -122,24 +122,25 @@ def generate_launch_description():
     # ── Robot State Publisher (loads URDF from robot_description_pkg) ─
     # This publishes the static TF for all URDF frames:
     #   base_footprint → base_link → lidar_link, camera_link, etc.
-    urdf_file = os.path.join(
-        get_package_share_directory('robot_description_pkg'),
-        'urdf', 'robot.urdf.xacro'   # ← adjust filename to your URDF
-    )
+    # NOTE: Temporarily commented out due to URDF issues
+    # urdf_file = os.path.join(
+    #     get_package_share_directory('robot_description_pkg'),
+    #     'urdf', 'robot.urdf.xacro'   # ← adjust filename to your URDF
+    # )
 
-    with open(urdf_file, 'r') as f:
-        robot_description = f.read()
+    # with open(urdf_file, 'r') as f:
+    #     robot_description = f.read()
 
-    robot_state_publisher = Node(
-        package    = 'robot_state_publisher',
-        executable = 'robot_state_publisher',
-        name       = 'robot_state_publisher',
-        output     = 'screen',
-        parameters = [{
-            'robot_description': robot_description,
-            'use_sim_time':      False,
-        }],
-    )
+    # robot_state_publisher = Node(
+    #     package    = 'robot_state_publisher',
+    #     executable = 'robot_state_publisher',
+    #     name       = 'robot_state_publisher',
+    #     output     = 'screen',
+    #     parameters = [{
+    #         'robot_description': robot_description,
+    #         'use_sim_time':      False,
+    #     }],
+    # )
 
     # ── RViz (optional, for visual debugging) ────────────────────────
     rviz_config = PathJoinSubstitution([
@@ -171,6 +172,6 @@ def generate_launch_description():
         log_mock,
         log_real,
         hardware_node,
-        robot_state_publisher,
+        # robot_state_publisher,  # Temporarily commented out
         rviz_node,
     ])

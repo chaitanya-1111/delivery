@@ -1,0 +1,92 @@
+# Safety Hardware Package Configuration
+# All zones, timeouts, policy flags
+
+# Safety Zone Thresholds (meters)
+safety_zones:
+  free:
+    min_distance: 0.60  # Distance threshold for FREE zone
+  caution:
+    max_distance: 0.60  # Zone boundary
+    min_distance: 0.35  # Zone boundary
+  critical:
+    max_distance: 0.35  # Zone boundary
+    min_distance: 0.20  # Zone boundary
+  emergency:
+    max_distance: 0.20  # Full stop threshold
+
+# Speed Scaling Factors (0.0 = stop, 1.0 = full speed)
+speed_limits:
+  free_zone: 1.0          # No restriction in free zone
+  caution_zone: 0.5       # 50% speed in caution
+  critical_zone: 0.1      # 10% speed in critical
+  emergency_zone: 0.0     # Full stop in emergency
+
+# Timeout Thresholds (seconds)
+timeouts:
+  lidar_scan: 2.0         # LIDAR must publish within this interval
+  hardware_heartbeat: 1.0 # Hardware heartbeat timeout
+  nav_health: 3.0         # Navigation health check timeout
+  cmd_vel_deadline: 0.5   # Velocity command must arrive within this interval
+
+# Velocity Thresholds
+velocity_checks:
+  zero_velocity_threshold: 0.01  # Consider velocity below this as zero
+
+# Safety Policy Flags
+safety_policy:
+  enforce_caution_limits: true     # Enforce speed scaling in caution zone
+  enforce_critical_limits: true    # Enforce speed scaling in critical zone
+  enforce_emergency_stop: true     # Enforce full stop in emergency zone
+  degrade_on_sensor_loss: true     # Degrade to stop if sensors lost
+  enable_soft_estop: true          # Support software e-stop
+
+# Sensor Configuration
+sensors:
+  lidar:
+    topic: /scan
+    enabled: true
+    min_samples_required: 10  # Minimum valid ranges per scan
+    angle_resolution_deg: 0.25
+    
+  imu:
+    topic: /imu/data
+    enabled: true
+    
+  odometry:
+    topic: /odom
+    enabled: false  # Optional
+    
+# Hardware Interface
+hardware:
+  velocity_topic: /cmd_vel_safe
+  estop_topic: /safety/estop
+  heartbeat_timeout: 1.0
+  
+# Diagnostics
+diagnostics:
+  publish_interval_hz: 1.0
+  include_distance_histogram: true
+  
+# Logging
+logging:
+  log_safety_events: true
+  log_level: INFO
+  log_directory: ~/.ros/safety_logs
+  max_log_file_size_mb: 100
+  
+# Motion Limits (for redundant safety)
+motion_limits:
+  max_linear_velocity: 1.0    # m/s
+  max_angular_velocity: 1.57  # rad/s (~90 deg/s)
+  
+# E-Stop Configuration
+estop:
+  software_estop_enabled: true
+  hardware_estop_pin: 23  # GPIO pin for hardware e-stop (optional)
+  estop_release_timeout: 30  # seconds before auto-release (if enabled)
+
+# Advanced Options
+advanced:
+  use_adaptive_scaling: false  # Gradually scale speed based on distance
+  enable_predictive_braking: false  # Brake before entering critical zone
+  safety_loop_frequency: 20  # Hz

@@ -1,0 +1,92 @@
+laser_filter_node:
+  ros__parameters:
+    scan_filter_chain:
+
+  # ── FILTER 1: Range Bounds ────────────────────────────────────
+  # Remove any laser return that is too close (likely the robot body
+  # or a sensor glitch) or too far (beyond reliable range).
+  #
+  # RPLidar C1/M2 specs:
+  #   Min reliable range: ~0.15m
+  #   Max reliable range: 12m (C1), 25m (M2)
+  #   Restaurant typical range needed: 0.2m to 8m
+  - name: range_filter
+    type: laser_filters/LaserScanRangeFilter
+    params:
+      use_message_range_limits: false
+
+      # TUNE THIS: measure distance from lidar center to outer edge
+      # of your robot chassis. Anything closer is your own body.
+      lower_threshold: 0.15       # meters — ignore closer than this
+      upper_threshold: 8.0        # meters — ignore farther than this
+
+      # What to do with filtered points: set to NaN (invisible to Nav2)
+      lower_replacement_value: nan
+      upper_replacement_value: nan
+
+  # ── FILTER 2: Angular Body Mask ───────────────────────────────
+  # Mask out angles where the robot's own body/wheels/tray appear.
+  #
+  # HOW TO FIND YOUR BODY HIT ANGLES:
+  #   1. Place robot in open space, nothing around it
+  #   2. Run: ros2 run rviz2 rviz2
+  #   3. Add LaserScan display for /scan_raw
+  #   4. Note which angles show constant short-range returns
+  #      (those are your robot body hits)
+  #   5. Set those angle ranges here
+  #
+  # ANGLE CONVENTION: 0° = forward, positive = CCW (left), negative = CW (right)
+  # All values in RADIANS. π = 3.14159
+  #
+  # Example: robot body occupies angles 155° to 180° and -180° to -155°
+  # (rear of robot). Adjust for your actual robot geometry!
+  - name: body_angle_filter
+    type: laser_filters/LaserScanAngularBoundsFilterInPlace
+    params:
+      # This removes a SINGLE range. For multiple ranges, stack multiple
+      # body_angle_filter entries with different names.
+      #
+      # Remove rear sector where robot body/motor housing blocks scan.
+      # Adjust these values after physical measurement on your robot!
+      lower_angle: -2.88    # -165° (rear-right boundary)
+      upper_angle:  2.88    #  165° (rear-left boundary)
+      # NOTE: This KEEPS the above range. Points OUTSIDE are removed.
+      # To REMOVE a range, we use a complementary approach — see below.
+
+  # Body hit removal using FootprintFilter is more robust.
+  # The angular filter above is a fallback. Primary method:
+
+  # ── FILTER 3: Footprint Filter ────────────────────────────────
+  # Remove any scan point that falls INSIDE the robot's footprint polygon.
+  # This is the most accurate way to remove body hits.
+  # Points inside = guaranteed self-hit = remove them.
+  #
+  # Set footprint to slightly larger than actual robot body.
+  # If robot is 30cm x 30cm, use 35cm x 35cm here for margin.
+  - name: footprint_filter
+    type: laser_filters/LaserScanFootprintFilter
+    params:
+      # Robot inscribed radius: half diagonal of robot body
+      # For 30x30cm robot: sqrt(0.15² + 0.15²) = 0.212m, use 0.22m
+      inscribed_radius: 0.22    # meters — MEASURE YOUR ROBOT
+
+  # ── FILTER 4: Median Filter ───────────────────────────────────
+  # Smooths out single-point noise spikes.
+  # A single laser return that is wildly different from its neighbors
+  # is almost certainly a glitch (glass reflection, dust, etc.).
+  #
+  # Uses a sliding window median: each point's value is replaced
+  # by the median of itself and its N neighbors.
+  - name: median_filter
+    type: laser_filters/LaserScanMedianFilter
+    params:
+      window_size: 3      # look at 3 consecutive scan points
+      # Use 3 for minimal latency. Use 5 for smoother but more latency.
+
+  # ── FILTER 5: NaN/Inf Remover ─────────────────────────────────
+  # Final cleanup: remove any remaining NaN or Inf values.
+  # These can crash some Nav2 components if not removed.
+  - name: nan_remover
+    type: laser_filters/LaserScanValidPointsFilter
+    params:
+      remove_nans: true

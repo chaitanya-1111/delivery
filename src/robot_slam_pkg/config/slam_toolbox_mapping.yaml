@@ -1,0 +1,164 @@
+# ============================================================
+# slam_toolbox_mapping.yaml
+#
+# SLAM Toolbox parameters for the MAPPING phase.
+# Used during the ONE-TIME restaurant floor mapping session.
+#
+# RESTAURANT-SPECIFIC TUNING EXPLAINED:
+#
+# Problem 1 — Glass walls & mirrors:
+#   Lidar reflects off glass at wrong angles → phantom walls in map.
+#   Solution: laser_filters (Step 1) removes obvious glass artifacts.
+#   Here: we tune scan matching to be less sensitive to sparse returns.
+#
+# Problem 2 — Moving people during mapping:
+#   If staff walk past during mapping, their bodies appear as walls.
+#   Solution: dynamic_obstacle_filter_node pre-processes /scan.
+#   Here: we set minimum_travel_distance so each pose is confirmed
+#   by multiple overlapping scans (transient obstacles wash out).
+#
+# Problem 3 — Open dining areas (large, low-feature spaces):
+#   Large open areas have few scan features → poor loop closure.
+#   Solution: increase search radius for loop closures.
+#
+# Problem 4 — Restaurant is 200-800 m² with multiple rooms:
+#   Large maps need more particles and wider search windows.
+#   Solution: increased link_scan_maximum_distance, more solver iterations.
+#
+# Problem 5 — Narrow doorways (0.8–1.0m wide):
+#   Robot must navigate through them but they're also scan choke-points.
+#   Solution: mapping resolution 0.05m (5cm) to capture doorways precisely.
+# ============================================================
+
+slam_toolbox:
+  ros__parameters:
+
+    # ── Coordinate Frames ─────────────────────────────────────────
+    odom_frame: odom
+    map_frame:  map
+    base_frame: base_footprint   # use base_footprint (projected to floor)
+                                  # NOT base_link (which may be mid-chassis)
+
+    # ── Topic ─────────────────────────────────────────────────────
+    scan_topic: /scan            # use FILTERED scan from Step 1
+
+    # ── Mode ──────────────────────────────────────────────────────
+    # mapping = build new map from scratch
+    # localization = use existing map (see slam_toolbox_localization.yaml)
+    mode: mapping
+
+    # ── Map Resolution ────────────────────────────────────────────
+    # 0.05m = 5cm per cell.
+    # This is the standard Nav2 resolution. Don't go coarser (0.1m)
+    # or doorways and tight corridors become impassable in the costmap.
+    # Don't go finer (0.025m) unless you have a very fast computer —
+    # it quadruples memory usage and slows loop closure.
+    resolution: 0.05
+
+    # ── Scan Processing ───────────────────────────────────────────
+    # Only add a new scan/pose to the map graph when the robot has moved
+    # this much. Too small = too many nodes = slow. Too large = gaps in map.
+    # 0.5m minimum movement between recorded poses is optimal for a restaurant
+    # (assuming robot drives at 0.3-0.4 m/s during mapping).
+    minimum_travel_distance: 0.5    # meters
+    minimum_travel_heading: 0.5     # radians (~28°)
+
+    # How many scans to buffer at each node for scan matching.
+    # More = better matching against nearby history, but more memory.
+    scan_buffer_size: 10
+    scan_buffer_maximum_scan_distance: 10.0   # meters
+
+    # ── Scan Matching ─────────────────────────────────────────────
+    # These control how SLAM aligns new scans to the existing map.
+    # Coarse match first (wide search), then fine match (precise).
+
+    # link_match_minimum_response_fine:
+    #   How strong the correlation must be to accept a scan match.
+    #   0.1 = accept weak matches (good for featureless areas like open dining)
+    #   Higher = stricter (fewer false matches but more drift in open areas)
+    link_match_minimum_response_fine: 0.1
+
+    # link_scan_maximum_distance:
+    #   How far to search for loop closure candidates (meters).
+    #   Restaurant: 2.5m to catch loops across the dining area.
+    #   Increase to 4.0 for very large restaurants (>500 m²).
+    link_scan_maximum_distance: 2.5
+
+    # distance_decomposition_radius:
+    #   Radius for pose graph decomposition during optimization.
+    #   Increase for larger maps to prevent memory issues.
+    distance_decomposition_radius: 2.0
+
+    # ── Loop Closure ──────────────────────────────────────────────
+    # Loop closure = when the robot revisits a known area, SLAM
+    # corrects accumulated drift by matching the current scan to
+    # the stored scan at that location.
+    # Critical for restaurant: robot will circle tables repeatedly.
+    do_loop_closing: true
+
+    # loop_match_minimum_response_coarse/fine:
+    #   Correlation threshold for accepting a loop closure.
+    #   Coarse: 0.35 (quick candidate filter), Fine: 0.45 (acceptance)
+    #   Lower = more loops detected but higher false-positive risk.
+    #   For restaurant (distinct furniture layout): 0.35/0.45 works well.
+    loop_match_minimum_response_coarse: 0.35
+    loop_match_minimum_response_fine:   0.45
+
+    # loop_match_maximum_variance_coarse:
+    #   Maximum position uncertainty to attempt loop closure.
+    #   Looser (3.0) = try loop closure even when uncertain.
+    loop_match_maximum_variance_coarse: 3.0
+
+    # ── Solver ────────────────────────────────────────────────────
+    # Ceres solver optimizes the pose graph (minimizes accumulated error).
+    # SPARSE_NORMAL_CHOLESKY is the standard choice for indoor robots.
+    solver_plugin:         solver_plugins::CeresSolver
+    ceres_linear_solver:   SPARSE_NORMAL_CHOLESKY
+    ceres_preconditioner:  SCHUR_JACOBI
+    ceres_trust_strategy:  LEVENBERG_MARQUARDT
+    ceres_dogleg_type:     TRADITIONAL_DOGLEG
+    ceres_loss_function:   None   # None = standard least-squares
+
+    # ── Map Saving ────────────────────────────────────────────────
+    # Save the SLAM pose graph to disk (separate from the .pgm/.yaml map).
+    # The pose graph allows you to RESUME a mapping session or
+    # continue from a saved state without starting over.
+    #
+    # This path is overridden at launch time via the map_file_name arg.
+    map_file_name: /home/robot/delivery_bot_ws/maps/restaurant_map
+    map_start_pose: [0.0, 0.0, 0.0]
+
+    # ── TF / Timing ───────────────────────────────────────────────
+    # How often to publish the map→odom TF transform.
+    # 0.02s = 50Hz. Must be faster than your controller frequency.
+    transform_publish_period: 0.02
+    tf_buffer_duration: 30.0        # seconds of TF history to keep
+
+    # map_update_interval: how often to update the /map topic.
+    # 5.0s is fine during mapping (not real-time critical).
+    # Lower to 2.0 if operators are watching in RViz.
+    map_update_interval: 5.0
+
+    # ── Performance ───────────────────────────────────────────────
+    # Process every scan (throttle_scans: 1).
+    # On slow hardware (Raspberry Pi), set to 2 or 3 to skip scans.
+    throttle_scans: 1
+
+    # use_multithread: use multiple CPU cores for scan matching.
+    # Always true on modern hardware.
+    use_multithread: true
+
+    # Max laser range to use for map building (meters).
+    # Matches our filter's upper_threshold from Step 1.
+    max_laser_range: 8.0
+
+    # ── Interactive Mode ──────────────────────────────────────────
+    # Enables the SLAM Toolbox RViz plugin.
+    # Lets you: manually close loops, serialize pose graphs,
+    # add/remove scan poses, and save maps interactively.
+    # Essential for the mapping session!
+    enable_interactive_mode: true
+
+    # ── Stack Size ────────────────────────────────────────────────
+    # Increase stack for large maps (prevents stack overflow on optimization).
+    stack_size_to_use: 40000000   # 40MB

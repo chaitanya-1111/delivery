@@ -1,0 +1,88 @@
+# ============================================================
+# delivery_locations.yaml
+#
+# Named delivery locations in MAP COORDINATES (meters).
+# These are used by the mission_manager (Step 2) to translate
+# human-readable locations like "table_3" into actual
+# NavigateToPose goals.
+#
+# HOW TO FIND THESE COORDINATES:
+#   1. Launch navigation with RViz
+#   2. Drive robot to a location manually
+#   3. Read the pose from /amcl_pose topic or RViz "Publish Point"
+#   4. Enter the x, y, yaw values here
+#
+# COORDINATE SYSTEM:
+#   - Origin (0,0) = where robot was when map was first built
+#   - x = East (positive) / West (negative)
+#   - y = North (positive) / South (negative)
+#   - yaw_deg = robot facing direction at this location
+#     0° = East, 90° = North, 180° = West, -90° = South
+# ============================================================
+
+locations:
+
+  # ── Home / Charging Dock ──────────────────────────────────────
+  home:
+    x: 0.0
+    y: 0.0
+    yaw_deg: 0.0
+    description: "Starting position / charging dock"
+
+  # ── Kitchen / Dispatch Area ───────────────────────────────────
+  kitchen:
+    x: 2.5
+    y: 0.5
+    yaw_deg: 180.0
+    description: "Kitchen counter — pickup location"
+
+  # ── Delivery Tables ───────────────────────────────────────────
+  table_1:
+    x: 4.0
+    y: 2.0
+    yaw_deg: -90.0
+    description: "Table 1 — window side"
+
+  table_2:
+    x: 4.0
+    y: 0.0
+    yaw_deg: -90.0
+    description: "Table 2 — center"
+
+  table_3:
+    x: 4.0
+    y: -2.0
+    yaw_deg: -90.0
+    description: "Table 3 — entrance side"
+
+  table_4:
+    x: 6.5
+    y: 2.0
+    yaw_deg: -90.0
+    description: "Table 4 — back left"
+
+  table_5:
+    x: 6.5
+    y: 0.0
+    yaw_deg: -90.0
+    description: "Table 5 — back center"
+
+  table_6:
+    x: 6.5
+    y: -2.0
+    yaw_deg: -90.0
+    description: "Table 6 — back right"
+
+  # ── Waypoints (intermediate stops) ────────────────────────────
+  # Used to route around obstacles or through doorways
+  hallway_entrance:
+    x: 3.0
+    y: 0.0
+    yaw_deg: 0.0
+    description: "Hallway entrance waypoint"
+
+  hallway_midpoint:
+    x: 5.0
+    y: 0.0
+    yaw_deg: 0.0
+    description: "Hallway midpoint waypoint"

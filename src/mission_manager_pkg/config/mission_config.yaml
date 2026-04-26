@@ -1,0 +1,130 @@
+# ============================================================
+# mission_config.yaml
+#
+# All tunable parameters for the delivery mission manager.
+# Change these without recompiling by editing this file.
+#
+# TIME BUDGET PER DELIVERY (guidance):
+#   Travel to kitchen:      ~30–90 sec
+#   Wait for staff to load: 60 sec max
+#   Travel to table:        ~30–120 sec
+#   Customer pickup wait:   90 sec max
+#   Return to dock:         ~30–90 sec
+#   ────────────────────────────────
+#   Total per delivery:     ~4–8 min
+# ============================================================
+
+mission:
+
+  # ── Timeouts ────────────────────────────────────────────────
+  timeouts:
+    # How long to wait at kitchen for staff to load food (seconds)
+    # Staff should be warned if approaching this limit
+    kitchen_load_sec: 60.0
+
+    # How long to wait at table for customer to take food (seconds)
+    # If exceeded: announce reminder, then return with food
+    customer_pickup_sec: 90.0
+
+    # How long a navigation goal can be in-flight before declaring timeout
+    # Should be > longest possible navigation time in your restaurant
+    navigation_timeout_sec: 180.0
+
+    # After arriving at table, how long to wait before first reminder
+    first_reminder_sec: 30.0
+
+    # If robot is stuck for this long, escalate to safety_supervisor
+    stuck_escalation_sec: 25.0
+
+  # ── Retry policy ────────────────────────────────────────────
+  retries:
+    # How many times to retry a failed navigation goal
+    navigation_max_retries: 2
+
+    # How many times to retry an entire mission before giving up
+    mission_max_retries: 1
+
+    # Seconds to wait between retry attempts
+    retry_wait_sec: 3.0
+
+  # ── Behavior ────────────────────────────────────────────────
+  behavior:
+    # Robot goes back to dock between deliveries if queue is empty
+    return_to_dock_when_idle: true
+
+    # If a new order arrives while returning to dock, accept it
+    # and reroute (rather than finishing dock return first)
+    preempt_dock_return: true
+
+    # Announce arrival at kitchen even if speech system is degraded
+    require_kitchen_announcement: true
+
+    # If customer doesn't collect food within customer_pickup_sec,
+    # what to do: "return" | "wait_longer" | "alert_staff"
+    pickup_timeout_action: "return"
+
+    # Speed profile near tables (used by nav_client_node approach_scale)
+    # 1.0 = use delivery_locations.yaml approach_offset as-is
+    # 0.5 = halve the approach offset (stop closer to table)
+    approach_scale: 1.0
+
+  # ── Speech announcements ────────────────────────────────────
+  # These strings are published to /robot/speech (TTS system from Step 1)
+  speech:
+    # Announced at kitchen on arrival
+    kitchen_arrival:
+      "I have arrived at the kitchen. Please place the order on my tray."
+
+    # Announced at kitchen if staff haven't loaded in first_reminder_sec
+    kitchen_reminder:
+      "I am still waiting for the order. Please place it on my tray."
+
+    # Announced if kitchen load times out
+    kitchen_timeout:
+      "I did not receive an order. Returning to dock. Please try again."
+
+    # Announced at table on arrival
+    table_arrival:
+      "Hello! Your order has arrived. Please take your food from my tray. Enjoy your meal!"
+
+    # Announced at table after first_reminder_sec
+    table_reminder:
+      "Reminder: your food is ready. Please collect it from my tray."
+
+    # Announced before returning with uncollected food
+    table_timeout_return:
+      "I will return the order to the kitchen as it was not collected. Sorry for the inconvenience."
+
+    # Announced when mission is cancelled
+    mission_cancelled:
+      "This delivery has been cancelled. Returning to base."
+
+    # Announced when robot is stuck
+    robot_stuck:
+      "I appear to be stuck. Please check if there is an obstacle in my path."
+
+    # Announced on mission completion (optional)
+    mission_complete:
+      "Delivery complete. Thank you!"
+
+  # ── Queue settings ───────────────────────────────────────────
+  queue:
+    # Maximum orders to hold in the queue
+    max_queue_size: 10
+
+    # Order priority levels: higher number = served first
+    # "urgent" orders (e.g. from manager override) get priority 2
+    priority_levels:
+      normal: 1
+      urgent: 2
+
+  # ── Logging ─────────────────────────────────────────────────
+  logging:
+    # Where to save mission log files
+    log_directory: "~/delivery_bot_ws/logs/missions"
+
+    # Rotate log file daily
+    rotate_daily: true
+
+    # Keep logs for N days
+    retention_days: 30

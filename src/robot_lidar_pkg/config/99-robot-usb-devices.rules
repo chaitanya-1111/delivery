@@ -1,0 +1,78 @@
+# ============================================================
+# 99-robot-usb-devices.rules
+# Udev rules for the delivery robot's USB devices.
+#
+# PURPOSE:
+#   Without udev rules, every USB device gets a random name like
+#   /dev/ttyUSB0 or /dev/ttyUSB1, and that name can CHANGE on every
+#   reboot or reconnect. This breaks your launch files.
+#
+#   With udev rules, the RPLidar ALWAYS appears as /dev/rplidar,
+#   the Arduino ALWAYS appears as /dev/robot_arduino, etc.
+#   Names are based on the USB device's serial number (unique per unit).
+#
+# INSTALLATION:
+#   sudo cp 99-robot-usb-devices.rules /etc/udev/rules.d/
+#   sudo udevadm control --reload-rules
+#   sudo udevadm trigger
+#   # Replug all USB devices
+#   ls -la /dev/rplidar    # should now exist
+#
+# FINDING YOUR DEVICE ATTRIBUTES:
+#   1. Plug in your RPLidar
+#   2. Run: lsusb
+#      Look for "Silicon Laboratories CP210x" or "QinHeng Electronics"
+#      That's the RPLidar's USB-to-serial chip.
+#   3. Run: udevadm info -a -n /dev/ttyUSB0 | grep -E 'idVendor|idProduct|serial'
+#      Note the idVendor, idProduct, and serial values.
+#   4. Update the ATTRS below with YOUR actual values.
+#
+# RPLIDAR C1 / M2 USB chip: CP2102 (Silicon Labs)
+#   Vendor ID:  10c4
+#   Product ID: ea60
+#   These are the SAME for all RPLidars using this chip.
+#   To tell multiple devices apart, use ATTRS{serial} (unique per unit).
+# ============================================================
+
+# ── RPLidar C1 / M2 ──────────────────────────────────────────
+# Silicon Labs CP2102 USB-to-UART (used by RPLidar C1, M2, A-series, S-series)
+#
+# IMPORTANT: Replace the ATTRS{serial} value with YOUR actual device serial.
+# Find it: udevadm info -a -n /dev/ttyUSB0 | grep 'ATTRS{serial}'
+#
+# If you only have ONE lidar and ONE robot, you can omit ATTRS{serial}
+# and match on idVendor + idProduct alone (simpler but less specific):
+
+# Option A: Match any RPLidar with CP2102 chip (simplest — use if only one)
+SUBSYSTEM=="tty", ATTRS{idVendor}=="10c4", ATTRS{idProduct}=="ea60", \
+    SYMLINK+="rplidar", \
+    MODE="0666", \
+    GROUP="dialout"
+
+# Option B: Match specific unit by serial number (use if you have multiple)
+# Uncomment and fill in YOUR serial number:
+# SUBSYSTEM=="tty", ATTRS{idVendor}=="10c4", ATTRS{idProduct}=="ea60", \
+#     ATTRS{serial}=="YOUR_SERIAL_NUMBER_HERE", \
+#     SYMLINK+="rplidar", \
+#     MODE="0666", \
+#     GROUP="dialout"
+
+# ── Arduino / Robot Hardware Interface ───────────────────────
+# Replace with your Arduino's actual idVendor + idProduct.
+# Find it: lsusb (look for "Arduino" or "CH340" or "FTDI")
+# Common Arduino Nano/Uno (CH340): Vendor=1a86, Product=7523
+# Common Arduino Mega (FTDI):      Vendor=0403, Product=6001
+SUBSYSTEM=="tty", ATTRS{idVendor}=="1a86", ATTRS{idProduct}=="7523", \
+    SYMLINK+="robot_arduino", \
+    MODE="0666", \
+    GROUP="dialout"
+
+# ── Notes ─────────────────────────────────────────────────────
+# MODE="0666" → any user can read/write (needed for ROS nodes)
+# GROUP="dialout" → Linux group for serial port access
+# Add yourself to dialout: sudo usermod -aG dialout $USER
+# Then log out and log in again.
+#
+# Verify after install:
+#   ls -la /dev/rplidar       → should link to /dev/ttyUSB0 (or similar)
+#   ls -la /dev/robot_arduino → should link to /dev/ttyUSB1 (or similar)

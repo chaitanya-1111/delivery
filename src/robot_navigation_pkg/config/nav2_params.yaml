@@ -1,0 +1,401 @@
+# ============================================================
+# nav2_params.yaml
+# Full Nav2 parameter configuration for delivery robot
+#
+# ARCHITECTURE EXPLAINED:
+#
+# nav2_lifecycle_manager
+#   └── manages startup/shutdown of all Nav2 nodes in order
+#
+# map_server          → serves a pre-built .pgm/.yaml map
+# amcl                → localizes robot ON that map using laser
+# planner_server      → computes global path A→B (NavFn algorithm)
+# controller_server   → follows that path with DWB local planner
+# behavior_server     → recovery behaviors (spin, backup, wait)
+# bt_navigator        → orchestrates all above via Behavior Tree
+# waypoint_follower   → chains multiple goal waypoints
+# ============================================================
+
+amcl:
+  ros__parameters:
+    # ---- What AMCL does ----
+    # AMCL = Adaptive Monte Carlo Localization
+    # It uses a "particle filter": thousands of guesses of where the
+    # robot might be, updated as lidar scans come in.
+    # Over time particles converge to the true robot pose.
+
+    use_sim_time: false
+
+    # Particle filter settings
+    min_particles: 500          # minimum particles (fewer = faster, less accurate)
+    max_particles: 2000         # maximum particles when lost/uncertain
+    alpha1: 0.2                 # rotation noise from rotation
+    alpha2: 0.2                 # rotation noise from translation
+    alpha3: 0.2                 # translation noise from translation
+    alpha4: 0.2                 # translation noise from rotation
+    alpha5: 0.2                 # strafe noise (for omni robots; 0 for diff-drive)
+
+    # Laser model settings
+    laser_model_type: "likelihood_field"
+    # likelihood_field is faster and works well for most indoor robots
+    # beam model is more accurate but slower
+
+    laser_max_range: 8.0        # meters — ignore lidar returns beyond this
+    laser_min_range: 0.15       # meters — ignore returns closer than this
+    max_beams: 60               # how many laser beams to use per scan (more=slower)
+
+    # Update frequency
+    update_min_d: 0.25          # only update particles after moving 0.25m
+    update_min_a: 0.2           # or rotating 0.2 radians (~11 degrees)
+    resample_interval: 1        # resample every N filter updates
+
+    # TF frames
+    base_frame_id: "base_footprint"
+    global_frame_id: "map"
+    odom_frame_id: "odom"
+
+    # Recovery: if robot is totally lost, randomly scatter particles
+    recovery_alpha_slow: 0.001
+    recovery_alpha_fast: 0.1
+
+    # Initial pose (where robot starts on map)
+    # Override at runtime with /initialpose topic or RViz
+    set_initial_pose: false
+    initial_pose:
+      x: 0.0
+      y: 0.0
+      z: 0.0
+      yaw: 0.0
+
+    # Save/restore location between runs
+    save_pose_rate: 0.5
+    tf_broadcast: true
+
+bt_navigator:
+  ros__parameters:
+    # ---- What BT Navigator does ----
+    # Orchestrates the navigation pipeline using a Behavior Tree (BT).
+    # The BT defines the logic: try planner → try controller →
+    # if stuck → run recovery → retry. It's like a flowchart
+    # that handles failures gracefully.
+
+    use_sim_time: false
+    global_frame: map
+    robot_base_frame: base_footprint
+    odom_topic: /odom
+
+    # Default BT XML files (from nav2_bt_navigator package)
+    default_nav_to_pose_bt_xml: ""         # uses built-in default
+    default_nav_through_poses_bt_xml: ""   # uses built-in default
+
+    # How often to check if we've reached the goal
+    goal_blackboard_id: goal
+    goals_blackboard_id: goals
+    path_blackboard_id: path
+
+    # Plugins used inside the behavior tree
+    plugin_lib_names:
+      - nav2_compute_path_to_pose_action_bt_node
+      - nav2_follow_path_action_bt_node
+      - nav2_back_up_action_bt_node
+      - nav2_spin_action_bt_node
+      - nav2_wait_action_bt_node
+      - nav2_clear_costmap_service_bt_node
+      - nav2_is_stuck_condition_bt_node
+      - nav2_goal_reached_condition_bt_node
+      - nav2_goal_updated_condition_bt_node
+      - nav2_initial_pose_received_condition_bt_node
+      - nav2_reinitialize_global_localization_service_bt_node
+      - nav2_rate_controller_bt_node
+      - nav2_distance_controller_bt_node
+      - nav2_speed_controller_bt_node
+      - nav2_truncate_path_action_bt_node
+      - nav2_navigate_to_pose_action_bt_node
+      - nav2_navigate_through_poses_action_bt_node
+
+controller_server:
+  ros__parameters:
+    # ---- What Controller Server does ----
+    # Takes a global path from the planner and computes velocity commands
+    # (/cmd_vel) to follow it. Uses DWB (Dynamic Window Approach).
+    #
+    # DWB works by:
+    # 1. Sampling many (v, omega) velocity pairs
+    # 2. Simulating each pair forward in time
+    # 3. Scoring each simulated trajectory (goal heading, path following, obstacle clearance)
+    # 4. Choosing the best scoring trajectory
+    # 5. Sending that velocity to the robot
+
+    use_sim_time: false
+    controller_frequency: 20.0     # Hz — how often to compute new cmd_vel
+    min_x_velocity_threshold: 0.001
+    min_y_velocity_threshold: 0.5
+    min_theta_velocity_threshold: 0.001
+
+    # Failure tolerance: how long to try before declaring failure
+    failure_tolerance: 0.3
+
+    progress_checker_plugins: ["progress_checker"]
+    goal_checker_plugins: ["general_goal_checker"]
+    controller_plugins: ["FollowPath"]
+
+    progress_checker:
+      plugin: "nav2_controller::SimpleProgressChecker"
+      required_movement_radius: 0.5   # must move 0.5m within time window
+      movement_time_allowance: 10.0   # seconds
+
+    general_goal_checker:
+      plugin: "nav2_controller::SimpleGoalChecker"
+      xy_goal_tolerance: 0.25         # meters — how close = "arrived"
+      yaw_goal_tolerance: 0.25        # radians — how aligned = "arrived"
+      stateful: True                  # remember when xy reached even if yaw still off
+
+    FollowPath:
+      plugin: "dwb_core::DWBLocalPlanner"
+
+      # Kinematic limits — SET THESE TO MATCH YOUR ROBOT
+      min_vel_x: 0.0                  # can't go backward (delivery robot)
+      max_vel_x: 0.4                  # max forward speed: 0.4 m/s
+      min_vel_y: 0.0                  # no sideways (diff-drive)
+      max_vel_y: 0.0
+      max_vel_theta: 0.8              # max rotation: 0.8 rad/s
+      min_speed_xy: 0.0
+      max_speed_xy: 0.4
+      min_speed_theta: 0.0
+
+      # Acceleration limits
+      acc_lim_x: 0.4                  # m/s² — gentle acceleration for delivery
+      acc_lim_y: 0.0
+      acc_lim_theta: 1.2              # rad/s²
+      decel_lim_x: -0.4              # deceleration (negative)
+      decel_lim_y: 0.0
+      decel_lim_theta: -1.2
+
+      # Trajectory simulation
+      sim_time: 1.5                   # seconds to simulate forward
+      vx_samples: 20                  # how many forward speed samples
+      vy_samples: 5
+      vtheta_samples: 20
+      use_dwa: true                   # use Dynamic Window constraint
+
+      # Scoring critics (what makes a good trajectory)
+      critics: ["RotateToGoal", "Oscillation", "BaseObstacle", "GoalAlign", "PathAlign", "PathDist", "GoalDist"]
+
+      BaseObstacle.scale: 0.02        # avoid obstacles
+      PathAlign.scale: 32.0           # stay near the global path
+      PathAlign.forward_point_distance: 0.1
+      GoalAlign.scale: 24.0           # point toward goal when close
+      GoalAlign.forward_point_distance: 0.1
+      PathDist.scale: 32.0            # stay close to the path
+      GoalDist.scale: 24.0            # get closer to goal
+      RotateToGoal.scale: 32.0        # rotate to face goal at end
+      RotateToGoal.slowing_factor: 5.0
+      RotateToGoal.lookahead_time: -1.0
+
+      # Debug / visualization
+      publish_evaluation: true
+      publish_global_plan: true
+      publish_local_plan: true
+      publish_trajectories: true
+      publish_cost_grid_pc: false
+
+local_costmap:
+  local_costmap:
+    ros__parameters:
+      # ---- What Local Costmap does ----
+      # A rolling window map centered on the robot.
+      # Shows what's immediately around the robot (from lidar).
+      # Used by the DWB controller to avoid obstacles.
+
+      use_sim_time: false
+      update_frequency: 5.0       # Hz
+      publish_frequency: 2.0      # Hz
+      global_frame: odom          # rolls with robot in odom frame
+      robot_base_frame: base_footprint
+
+      # Window size: 4m x 4m around robot
+      width: 4
+      height: 4
+      resolution: 0.05            # 5cm per cell
+
+      # Robot footprint as polygon [meters from center]
+      # Adjust to match your physical robot dimensions!
+      # This is a 0.3m x 0.3m square robot
+      footprint: "[[0.15, 0.15], [0.15, -0.15], [-0.15, -0.15], [-0.15, 0.15]]"
+      # Alternative: use robot_radius: 0.20 for circular footprint
+
+      rolling_window: true        # window moves with robot
+
+      plugins: ["voxel_layer", "inflation_layer"]
+
+      voxel_layer:
+        plugin: "nav2_costmap_2d::VoxelLayer"
+        enabled: True
+        publish_voxel_map: True
+        origin_z: 0.0
+        z_resolution: 0.05
+        z_voxels: 16
+        max_obstacle_height: 2.0
+        mark_threshold: 0
+        observation_sources: scan
+        scan:
+          topic: /scan               # LIDAR topic — change to /scan or your topic
+          max_obstacle_height: 2.0
+          clearing: True
+          marking: True
+          data_type: "LaserScan"
+          raytrace_max_range: 3.0
+          raytrace_min_range: 0.0
+          obstacle_max_range: 2.5
+          obstacle_min_range: 0.0
+
+      inflation_layer:
+        plugin: "nav2_costmap_2d::InflationLayer"
+        cost_scaling_factor: 3.0    # how fast cost drops off with distance
+        inflation_radius: 0.55      # inflate obstacles by 55cm for safety
+
+      always_send_full_costmap: True
+
+global_costmap:
+  global_costmap:
+    ros__parameters:
+      # ---- What Global Costmap does ----
+      # A full-map sized grid showing all known obstacles.
+      # Used by the NavFn planner to compute the global path.
+      # Built from the static map + any new sensor detections.
+
+      use_sim_time: false
+      update_frequency: 1.0
+      publish_frequency: 1.0
+      global_frame: map
+      robot_base_frame: base_footprint
+      resolution: 0.05
+
+      footprint: "[[0.15, 0.15], [0.15, -0.15], [-0.15, -0.15], [-0.15, 0.15]]"
+
+      track_unknown_space: true
+      plugins: ["static_layer", "obstacle_layer", "inflation_layer"]
+
+      static_layer:
+        plugin: "nav2_costmap_2d::StaticLayer"
+        map_subscribe_transient_local: True
+        # Reads /map topic from map_server
+
+      obstacle_layer:
+        plugin: "nav2_costmap_2d::ObstacleLayer"
+        enabled: True
+        observation_sources: scan
+        scan:
+          topic: /scan
+          max_obstacle_height: 2.0
+          clearing: True
+          marking: True
+          data_type: "LaserScan"
+          raytrace_max_range: 3.0
+          raytrace_min_range: 0.0
+          obstacle_max_range: 2.5
+          obstacle_min_range: 0.0
+
+      inflation_layer:
+        plugin: "nav2_costmap_2d::InflationLayer"
+        cost_scaling_factor: 3.0
+        inflation_radius: 0.55
+
+      always_send_full_costmap: True
+
+map_server:
+  ros__parameters:
+    # Serves the pre-built map file.
+    # In SLAM mode, this is replaced by slam_toolbox.
+    use_sim_time: false
+    yaml_filename: ""   # set at launch time with map_file argument
+
+map_saver:
+  ros__parameters:
+    use_sim_time: false
+    save_map_timeout: 5.0
+    free_thresh_default: 0.25
+    occupied_thresh_default: 0.65
+    map_subscribe_transient_local: True
+
+planner_server:
+  ros__parameters:
+    # ---- What Planner Server does ----
+    # Computes a global path from robot's current pose to the goal.
+    # Uses NavFn (Dijkstra/A* variant) on the global costmap.
+    # Outputs a list of waypoints (/plan topic).
+
+    expected_planner_frequency: 20.0
+    use_sim_time: false
+
+    planner_plugins: ["GridBased"]
+    GridBased:
+      plugin: "nav2_navfn_planner/NavfnPlanner"
+      tolerance: 0.5              # how far from goal is acceptable for planning
+      use_astar: true             # use A* (faster) vs Dijkstra
+      allow_unknown: true         # plan through unknown space (useful early on)
+
+behavior_server:
+  ros__parameters:
+    # ---- Recovery Behaviors ----
+    # When the robot gets stuck, these run in sequence:
+    # 1. Spin in place (might clear a sensor blockage)
+    # 2. Back up slightly
+    # 3. Wait and retry
+    # If all fail → navigation action returns FAILED
+
+    costmap_topic: local_costmap/costmap_raw
+    footprint_topic: local_costmap/published_footprint
+    cycle_frequency: 10.0
+    use_sim_time: false
+
+    behavior_plugins: ["spin", "backup", "wait"]
+
+    spin:
+      plugin: "nav2_behaviors/Spin"
+    backup:
+      plugin: "nav2_behaviors/BackUp"
+    wait:
+      plugin: "nav2_behaviors/Wait"
+
+    global_frame: odom
+    robot_base_frame: base_footprint
+    transform_tolerance: 0.1
+    simulate_ahead_time: 2.0
+    max_rotational_vel: 0.8
+    min_rotational_vel: 0.4
+    rotational_acc_lim: 1.2
+
+waypoint_follower:
+  ros__parameters:
+    # Chains multiple NavigateToPose goals into a mission route
+    loop_rate: 20
+    stop_on_failure: false     # keep going even if one waypoint fails
+    use_sim_time: false
+    waypoint_task_executor_plugin: "wait_at_waypoint"
+    wait_at_waypoint:
+      plugin: "nav2_waypoint_follower::WaitAtWaypoint"
+      enabled: True
+      waypoint_pause_duration: 200   # milliseconds to pause at each waypoint
+
+lifecycle_manager_navigation:
+  ros__parameters:
+    use_sim_time: false
+    autostart: true          # auto-start all managed nodes on launch
+    bond_timeout: 4.0
+    node_names:
+      - "map_server"
+      - "amcl"
+      - "planner_server"
+      - "controller_server"
+      - "behavior_server"
+      - "bt_navigator"
+      - "waypoint_follower"
+
+lifecycle_manager_slam:
+  ros__parameters:
+    use_sim_time: false
+    autostart: true
+    bond_timeout: 4.0
+    node_names:
+      - "slam_toolbox"

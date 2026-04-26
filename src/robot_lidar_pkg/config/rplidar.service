@@ -1,0 +1,54 @@
+[Unit]
+Description=RPLidar ROS 2 Node
+Documentation=https://github.com/Slamtec/rplidar_ros
+After=network.target
+
+# Requires ROS 2 environment to be sourced.
+# Adjust the ExecStart path to match your workspace and username.
+
+[Service]
+Type=simple
+User=robot                      # Change to your Linux username
+Group=dialout                   # Must be in dialout group for serial access
+
+# Load ROS 2 environment
+# Change 'robot' to your username and adjust paths if needed
+Environment="HOME=/home/robot"
+EnvironmentFile=-/home/robot/delivery_bot_ws/ros_env.sh
+
+# Start the lidar bringup launch
+# Change path to match your actual workspace location
+ExecStart=/bin/bash -c "source /opt/ros/humble/setup.bash && \
+                        source /home/robot/delivery_bot_ws/install/setup.bash && \
+                        ros2 launch robot_lidar_pkg lidar_bringup.launch.py \
+                            use_rviz:=false"
+
+# Restart policy: always restart if it crashes
+# OnFailure: if it crashes 3 times in 30s, raise alert
+Restart=always
+RestartSec=3
+StartLimitIntervalSec=30
+StartLimitBurst=3
+
+# Give it 15 seconds to start before considering it failed
+TimeoutStartSec=15
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=rplidar
+
+# Allow this service to be restarted by the watchdog node
+# Add to sudoers: robot ALL=(ALL) NOPASSWD: /bin/systemctl restart rplidar.service
+# Command: sudo visudo
+
+[Install]
+WantedBy=multi-user.target
+
+# ── INSTALLATION ──────────────────────────────────────────────
+# sudo cp rplidar.service /etc/systemd/system/
+# sudo systemctl daemon-reload
+# sudo systemctl enable rplidar.service    ← auto-start on boot
+# sudo systemctl start  rplidar.service    ← start now
+# sudo systemctl status rplidar.service    ← check status
+# journalctl -u rplidar.service -f         ← view live logs
