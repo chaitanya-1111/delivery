@@ -39,6 +39,17 @@ from tf2_ros import TransformBroadcaster
 # ══════════════════════════════════════════════════════════════
 #  ROBOT PHYSICAL CONSTANTS  (match your hardware exactly)
 # ══════════════════════════════════════════════════════════════
+#
+# CALIBRATION ORDER (important):
+#   1) WHEEL_DIAMETER      -> affects linear distance scale
+#   2) WHEEL_SEPARATION    -> affects turning accuracy
+#   3) ENCODER_PPR/GEAR_RATIO -> affects odometry precision scale
+#
+# Quick field test:
+#   - Drive straight 2.0 m and compare /odom distance.
+#   - Rotate in place 360 deg and compare /odom yaw.
+#   - Tune diameter first for straight error, then separation for turn error.
+#   - Re-test both after each change.
 
 WHEEL_DIAMETER      = 0.20
 WHEEL_RADIUS        = WHEEL_DIAMETER / 2.0
@@ -50,6 +61,7 @@ QUADRATURE_MULT     = 4
 GEAR_RATIO          = 71
 ENCODER_CPR         = ENCODER_PPR * QUADRATURE_MULT * GEAR_RATIO  # 3692
 
+# Derived odometry scale factors (recomputed from the calibration constants above).
 METERS_PER_TICK     = WHEEL_CIRCUMFERENCE / ENCODER_CPR  # 0.0001702 m/tick
 TICKS_PER_METER     = ENCODER_CPR / WHEEL_CIRCUMFERENCE  # 5878 ticks/m
 

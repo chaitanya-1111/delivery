@@ -48,6 +48,13 @@ class LidarTFNode(Node):
         # ── Parameters ────────────────────────────────────────────
         # PRODUCTION: Set these to your actual measured values!
         # These defaults assume lidar centered on robot, 18cm high.
+        #
+        # QUICK CALIBRATION CHECKLIST:
+        #   1) Measure lidar center relative to base_link origin.
+        #   2) Set x/y/z in meters (x forward, y left, z up).
+        #   3) Set yaw in radians (0 forward, +pi/2 left, +pi backward).
+        #   4) Verify with: ros2 run tf2_ros tf2_echo base_link laser
+        #   5) If scan appears mirrored/rotated in RViz, revisit yaw first.
         self.declare_parameter('parent_frame', 'base_link')
         self.declare_parameter('child_frame',  'laser')
         self.declare_parameter('x',     0.0)    # meters forward from base_link
@@ -90,7 +97,8 @@ class LidarTFNode(Node):
             f'  Rotation: roll={math.degrees(self._roll):.1f}°, '
             f'pitch={math.degrees(self._pitch):.1f}°, '
             f'yaw={math.degrees(self._yaw):.1f}°\n'
-            f'  IMPORTANT: Verify these match your physical robot measurements!'
+            f'  IMPORTANT: Verify these match your physical robot measurements!\n'
+            f'  Quick verify: ros2 run tf2_ros tf2_echo base_link laser'
         )
 
     def _publish_static_tf(self):

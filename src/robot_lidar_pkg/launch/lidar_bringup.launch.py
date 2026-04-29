@@ -42,6 +42,8 @@ def generate_launch_description():
         description='RPLidar scan mode: Standard, Boost, Sensitivity, Stability'
     )
 
+    # Calibration arguments for base_link -> laser transform.
+    # Tune these during bringup without editing node code.
     lidar_x_arg = DeclareLaunchArgument(
         'lidar_x',
         default_value='0.0',
@@ -101,7 +103,7 @@ def generate_launch_description():
             'inverted': False,
         }],
         remappings=[
-            ('/scan', '/scan_raw'),
+            ('/scan', '/scan'),
         ]
     )
 
@@ -215,7 +217,7 @@ def generate_launch_description():
         enable_watchdog_arg,
         startup_msg,
         rplidar_node,
-        laser_filter_node,
+        # laser_filter_node,  # disabled due to config issues
         lidar_tf_node,
         lidar_diag_node,
         scan_watchdog_node,

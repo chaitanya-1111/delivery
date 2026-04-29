@@ -25,6 +25,9 @@ setup(
     entry_points={
         'console_scripts': [
             'mapping_session = robot_slam_pkg.scripts.mapping_session:main',
+            'dynamic_obstacle_filter_node = robot_slam_pkg.dynamic_obstacle_filter_node:main',
+            'map_quality_node = robot_slam_pkg.map_quality_node:main',
+            'map_manager_node = robot_slam_pkg.map_manager_node:main',
         ],
     },
 )

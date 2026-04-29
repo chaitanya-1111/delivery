@@ -35,17 +35,20 @@ USAGE:
 """
 
 import os
-from ament_python import LaunchDescription
-from ament_python.actions import Node, DeclareLaunchArgument, LogInfo
-from ament_python.substitutions import LaunchConfiguration
-from ament_python.conditions import IfCondition
+from launch import LaunchDescription
+from launch.actions import DeclareLaunchArgument, LogInfo
+from launch.conditions import IfCondition
+from launch.substitutions import LaunchConfiguration
+from launch_ros.actions import Node
 from ament_index_python.packages import get_package_share_directory
 
 
 def generate_launch_description():
 
-    pkg       = get_package_share_directory('robot_slam_pkg')
-    slam_cfg  = os.path.join(pkg, 'config', 'slam_toolbox_mapping.yaml')
+    pkg         = get_package_share_directory('robot_slam_pkg')
+    prefix_dir  = os.path.dirname(os.path.dirname(pkg))
+    bin_dir     = os.path.join(prefix_dir, 'bin')
+    slam_cfg    = os.path.join(pkg, 'config', 'slam_toolbox_mapping.yaml')
     maps_default = os.path.expanduser('~/delivery_bot_ws/maps')
 
     # ── Arguments ─────────────────────────────────────────────────
@@ -87,8 +90,8 @@ def generate_launch_description():
     # don't become phantom walls in the map.
     # slam_toolbox subscribes to /scan_for_slam (output of this node).
     dynamic_filter_node = Node(
-        package='robot_slam_pkg',
-        executable='dynamic_obstacle_filter_node',
+        package=None,
+        executable=os.path.join(bin_dir, 'dynamic_obstacle_filter_node'),
         name='dynamic_obstacle_filter_node',
         output='screen',
         parameters=[{
@@ -128,8 +131,8 @@ def generate_launch_description():
     # ── NODE 3: Map Manager ────────────────────────────────────────
     # Handles versioned map saving, auto-saves, registry.
     map_manager_node = Node(
-        package='robot_slam_pkg',
-        executable='map_manager_node',
+        package=None,
+        executable=os.path.join(bin_dir, 'map_manager_node'),
         name='map_manager_node',
         output='screen',
         parameters=[{
@@ -143,8 +146,8 @@ def generate_launch_description():
 
     # ── NODE 4: Map Quality Monitor ───────────────────────────────
     map_quality_node = Node(
-        package='robot_slam_pkg',
-        executable='map_quality_node',
+        package=None,
+        executable=os.path.join(bin_dir, 'map_quality_node'),
         name='map_quality_node',
         output='screen',
         parameters=[{

@@ -10,22 +10,37 @@ This directory is the **source space** for `delivery_bot_ws`. Each subdirectory 
 
 | Directory | Type | Summary |
 |-----------|------|---------|
-| [robot_interfaces](robot_interfaces/README.md) | `ament_cmake` | Custom `.msg` types: `Intent`, `AIRequest`, `AIResponse`, `SpeechText`, `SessionState`, `FaceBox`, `FaceTarget` |
-| [robot_description_pkg](robot_description_pkg/README.md) | `ament_cmake` | URDF/Xacro, meshes, RViz, `view_robot.launch.py` |
-| [robot_hardware_pkg](robot_hardware_pkg/README.md) | `ament_python` | Differential drive interface, odometry, optional mock Arduino |
-| [robot_bringup_pkg](robot_bringup_pkg/README.md) | `ament_python` | High-level launch: perception + dialog stack |
-| [robot_camera_pkg](robot_camera_pkg/README.md) | `ament_python` | USB camera → `sensor_msgs/Image` |
-| [esp32_camera_pkg](esp32_camera_pkg/README.md) | `ament_python` | ESP32-CAM HTTP stream → `sensor_msgs/Image` |
-| [audio_input_pkg](audio_input_pkg/README.md) | `ament_python` | PyAudio microphone → `std_msgs/Int16MultiArray` |
-| [face_detection_pkg](face_detection_pkg/README.md) | `ament_python` | OpenCV YuNet → `FaceBox`, face presence |
-| [face_tracking_pkg](face_tracking_pkg/README.md) | `ament_python` | Largest/primary face → `FaceTarget` |
-| [servo_control_pkg](servo_control_pkg/README.md) | `ament_python` | `FaceTarget` → pan/tilt (simulation default) |
-| [speech_to_text_pkg](speech_to_text_pkg/README.md) | `ament_python` | Audio subscription + keyboard “speech” for testing |
-| [intent_classifier_pkg](intent_classifier_pkg/README.md) | `ament_python` | Text → `Intent` on `/nlu/intent` |
-| [session_manager_pkg](session_manager_pkg/README.md) | `ament_python` | Session FSM, bridges vision, NLU, AI, TTS |
-| [ai_dialog_pkg](ai_dialog_pkg/README.md) | `ament_python` | `/ai/request` → `/ai/response` (rule-based) |
-| [tts_player_pkg](tts_player_pkg/README.md) | `ament_python` | `/robot/speech` → speech or timed simulation |
-| [ai_bridge_pkg](ai_bridge_pkg/README.md) | `ament_python` | Reserved / future bridge (no executables) |
+| [audio_input_pkg](audio_input_pkg/README.md) | `ament_python` | Microphone input publisher |
+| [esp32_camera_pkg](esp32_camera_pkg/README.md) | `ament_python` | ESP32 camera stream publisher |
+| [face_detection_pkg](face_detection_pkg/README.md) | `ament_python` | Face detection and face metadata topics |
+| [intent_classifier_pkg](intent_classifier_pkg/README.md) | `ament_python` | STT text to intent classification |
+| [mission_manager_pkg](mission_manager_pkg/README.md) | `ament_python` | Delivery mission FSM, queue, and mission logging |
+| [robot_bringup_pkg](robot_bringup_pkg/README.md) | `ament_python` | High-level launch package for integrated bringup |
+| [robot_description_pkg](robot_description_pkg/README.md) | `ament_cmake` | URDF/Xacro robot model, RViz, robot description assets |
+| [robot_hardware_pkg](robot_hardware_pkg/README.md) | `ament_python` | `/cmd_vel` to motors + encoder odometry + diagnostics |
+| [robot_interfaces](robot_interfaces/README.md) | `ament_cmake` | Custom message definitions used across the stack |
+| [robot_lidar_pkg](robot_lidar_pkg/README.md) | `ament_python` | RPLidar bringup, TF mount calibration, watchdog, diagnostics |
+| [robot_navigation_pkg](robot_navigation_pkg/README.md) | `ament_python` | Nav2 bringup helpers and navigation bridge nodes |
+| [robot_slam_pkg](robot_slam_pkg/README.md) | `ament_python` | SLAM mapping/localization launch and map utilities |
+| [safety_supervisor_pkg](safety_supervisor_pkg/README.md) | `ament_python` | Safety monitoring, watchdogs, and safety status reporting |
+| [session_manager_pkg](session_manager_pkg/README.md) | `ament_python` | Session state management and conversation orchestration |
+| [speech_to_text_pkg](speech_to_text_pkg/README.md) | `ament_python` | Speech-to-text and keyboard test input |
+| [tts_player_pkg](tts_player_pkg/README.md) | `ament_python` | Text-to-speech playback node |
+
+## Calibration code locations
+
+If you want to calibrate the robot quickly, these are the main files:
+
+- **Lidar mount (extrinsics):** `robot_lidar_pkg/robot_lidar_pkg/lidar_tf_node.py`
+  - Tune `x`, `y`, `z`, `roll`, `pitch`, `yaw` for `base_link -> laser`.
+  - Also pass these from launch args in `robot_lidar_pkg/launch/lidar_bringup.launch.py`.
+- **Drive and odometry constants:** `robot_hardware_pkg/robot_hardware_pkg/hardware_interface_node.py`
+  - Tune `WHEEL_DIAMETER`, `WHEEL_SEPARATION`, `ENCODER_PPR`, `GEAR_RATIO`.
+  - These directly affect `/odom`, TF, and path tracking quality.
+- **SLAM quality knobs:** `robot_slam_pkg/config/slam_toolbox_mapping.yaml` and `robot_slam_pkg/launch/slam_mapping.launch.py`
+  - Use after lidar/odometry calibration is stable.
+
+Recommended order: calibrate lidar TF first, then wheel/encoder odometry, then tune SLAM/Nav2.
 
 ## Quick launch
 

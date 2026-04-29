@@ -15,6 +15,7 @@ install(
     meshes
     launch
     config
+    gazebo
   DESTINATION
     share/${PROJECT_NAME}/
 )
