@@ -7,6 +7,10 @@
   <maintainer email="chaitanya@todo.todo">chaitanya</maintainer>
   <license>TODO: License declaration</license>
 
+  <buildtool_depend>ament_python</buildtool_depend>
+
+  <depend>rclpy</depend>
+  <depend>std_msgs</depend>
   <depend>robot_interfaces</depend>
 
   <test_depend>ament_copyright</test_depend>

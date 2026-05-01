@@ -2,7 +2,7 @@
 
 **Build type:** `ament_python`
 
-**Speech-to-text** node for the delivery robot. Subscribes to microphone chunks on `/audio/data` (placeholder callback) and exposes a **keyboard thread** so you can type utterances in the terminal—especially useful on **WSL** without a working mic pipeline.
+**Speech-to-text** node for the delivery robot. Subscribes to microphone chunks on `/audio/data` and converts real microphone audio into text with SpeechRecognition. Keyboard override is still available for terminal testing.
 
 ## Executable
 
