@@ -1,25 +1,40 @@
 <?xml version="1.0"?>
 <!--
+  ============================================================================
   robot_description_pkg/urdf/base.xacro
-  Structural components: chassis, body column, 4 CENTER shelves, head
+  ============================================================================
+  Package   : robot_description_pkg
+  Robot     : Autonomous Food Delivery Robot  
+  Contains  : Chassis, body column, 6 shelves, head (NO wheels, NO sensors)
+  ============================================================================
 -->
+
 <robot name="delivery_robot" xmlns:xacro="http://www.ros.org/wiki/xacro">
 
+  <!-- ======================================================================
+       EXTERNAL MACRO FILES
+       ====================================================================== -->
   <xacro:include filename="$(find robot_description_pkg)/urdf/materials.xacro"/>
   <xacro:include filename="$(find robot_description_pkg)/urdf/inertia_macros.xacro"/>
 
-  <!-- PARAMETERS -->
+  <!-- ======================================================================
+       GLOBAL ROBOT PARAMETERS
+       ====================================================================== -->
+
+  <!-- Chassis -->
   <xacro:property name="chassis_length"       value="0.500"/>
   <xacro:property name="chassis_width"        value="0.400"/>
   <xacro:property name="chassis_height"       value="0.180"/>
   <xacro:property name="chassis_mass"         value="18.0"/>
 
+  <!-- Body Column -->
   <xacro:property name="body_length"          value="0.120"/>
   <xacro:property name="body_width"           value="0.100"/>
   <xacro:property name="body_height"          value="0.820"/>
   <xacro:property name="body_mass"            value="6.0"/>
   <xacro:property name="body_z_offset"        value="${chassis_height / 2.0 + body_height / 2.0}"/>
 
+  <!-- Wheels (parameters exported for wheels.xacro) -->
   <xacro:property name="wheel_radius"         value="0.080"/>
   <xacro:property name="wheel_width"          value="0.055"/>
   <xacro:property name="wheel_mass"           value="1.20"/>
@@ -27,12 +42,14 @@
   <xacro:property name="wheel_y_offset"       value="0.230"/>
   <xacro:property name="wheel_z_offset"       value="0.0"/>
 
+  <!-- Casters -->
   <xacro:property name="caster_radius"        value="0.045"/>
   <xacro:property name="caster_mass"          value="0.30"/>
   <xacro:property name="caster_x_offset"      value="-0.175"/>
   <xacro:property name="caster_y_offset"      value="0.140"/>
   <xacro:property name="caster_z_offset"      value="${-(wheel_radius - caster_radius)}"/>
 
+  <!-- Shelves -->
   <xacro:property name="shelf_length"         value="0.280"/>
   <xacro:property name="shelf_width"          value="0.220"/>
   <xacro:property name="shelf_thickness"      value="0.012"/>
@@ -40,16 +57,21 @@
   <xacro:property name="shelf1_z"             value="0.620"/>
   <xacro:property name="shelf2_z"             value="0.430"/>
   <xacro:property name="shelf3_z"             value="0.240"/>
+  <xacro:property name="shelf_x_side"         value="0.200"/>
 
+  <!-- Head -->
   <xacro:property name="head_length"          value="0.070"/>
   <xacro:property name="head_width"           value="0.200"/>
   <xacro:property name="head_height"          value="0.060"/>
   <xacro:property name="head_mass"            value="0.80"/>
   <xacro:property name="head_z"               value="1.080"/>
 
+  <!-- Math -->
   <xacro:property name="M_PI"                 value="3.14159265358979"/>
 
-  <!-- BASE FOOTPRINT -->
+  <!-- ======================================================================
+       BASE FOOTPRINT
+       ====================================================================== -->
   <link name="base_footprint"/>
 
   <joint name="base_footprint_joint" type="fixed">
@@ -58,7 +80,9 @@
     <origin xyz="0 0 ${wheel_radius}" rpy="0 0 0"/>
   </joint>
 
-  <!-- BASE LINK -->
+  <!-- ======================================================================
+       BASE LINK
+       ====================================================================== -->
   <link name="base_link">
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0"/>
@@ -80,11 +104,15 @@
     <inertial>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <mass value="${chassis_mass}"/>
-      <xacro:box_inertia m="${chassis_mass}" x="${chassis_length}" y="${chassis_width}" z="${chassis_height}"/>
+      <xacro:box_inertia
+        m="${chassis_mass}"
+        x="${chassis_length}"
+        y="${chassis_width}"
+        z="${chassis_height}"/>
     </inertial>
   </link>
 
-  <!-- Define materials once -->
+  <!-- Define remaining materials once (referenced later by name only) -->
   <material name="almost_black">
     <color rgba="0.10 0.10 0.10 1.0"/>
   </material>
@@ -98,7 +126,9 @@
     <color rgba="0.10 0.80 0.10 1.0"/>
   </material>
 
-  <!-- BODY COLUMN -->
+  <!-- ======================================================================
+       BODY COLUMN
+       ====================================================================== -->
   <link name="body_link">
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0"/>
@@ -116,21 +146,26 @@
     <inertial>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <mass value="${body_mass}"/>
-      <xacro:box_inertia m="${body_mass}" x="${body_length}" y="${body_width}" z="${body_height}"/>
+      <xacro:box_inertia
+        m="${body_mass}"
+        x="${body_length}"
+        y="${body_width}"
+        z="${body_height}"/>
     </inertial>
   </link>
 
   <joint name="body_joint" type="fixed">
     <parent link="base_link"/>
     <child  link="body_link"/>
-    <!-- Move body column to the rear of the chassis -->
-    <origin xyz="-0.180 0 ${body_z_offset}" rpy="0 0 0"/>
+    <origin xyz="-0.040 0 ${body_z_offset}" rpy="0 0 0"/>
   </joint>
 
-  <!-- 4 CENTER SHELVES (cantilevered forward from rear column) -->
-  
-  <!-- Shelf 1 (top) -->
-  <link name="shelf1_link">
+  <!-- ======================================================================
+       SHELVES (6 total: 3 left + 3 right)
+       ====================================================================== -->
+
+  <!-- Shelf 1 LEFT -->
+  <link name="shelf1_left_link">
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
@@ -151,15 +186,14 @@
     </inertial>
   </link>
 
-  <joint name="shelf1_joint" type="fixed">
+  <joint name="shelf1_left_joint" type="fixed">
     <parent link="body_link"/>
-    <child  link="shelf1_link"/>
-    <!-- Shelf extends forward from body column (body is at back edge) -->
-    <origin xyz="0.140 0 ${shelf1_z - body_z_offset}" rpy="0 0 0"/>
+    <child  link="shelf1_left_link"/>
+    <origin xyz="0 ${shelf_x_side} ${shelf1_z - body_z_offset}" rpy="0 0 0"/>
   </joint>
 
-  <!-- Shelf 2 -->
-  <link name="shelf2_link">
+  <!-- Shelf 1 RIGHT -->
+  <link name="shelf1_right_link">
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
@@ -180,14 +214,14 @@
     </inertial>
   </link>
 
-  <joint name="shelf2_joint" type="fixed">
+  <joint name="shelf1_right_joint" type="fixed">
     <parent link="body_link"/>
-    <child  link="shelf2_link"/>
-    <origin xyz="0.140 0 ${shelf2_z - body_z_offset}" rpy="0 0 0"/>
+    <child  link="shelf1_right_link"/>
+    <origin xyz="0 ${-shelf_x_side} ${shelf1_z - body_z_offset}" rpy="0 0 0"/>
   </joint>
 
-  <!-- Shelf 3 -->
-  <link name="shelf3_link">
+  <!-- Shelf 2 LEFT -->
+  <link name="shelf2_left_link">
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
@@ -208,14 +242,14 @@
     </inertial>
   </link>
 
-  <joint name="shelf3_joint" type="fixed">
+  <joint name="shelf2_left_joint" type="fixed">
     <parent link="body_link"/>
-    <child  link="shelf3_link"/>
-    <origin xyz="0.140 0 ${shelf3_z - body_z_offset}" rpy="0 0 0"/>
+    <child  link="shelf2_left_link"/>
+    <origin xyz="0 ${shelf_x_side} ${shelf2_z - body_z_offset}" rpy="0 0 0"/>
   </joint>
 
-  <!-- Shelf 4 (bottom) -->
-  <link name="shelf4_link">
+  <!-- Shelf 2 RIGHT -->
+  <link name="shelf2_right_link">
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
@@ -236,13 +270,71 @@
     </inertial>
   </link>
 
-  <joint name="shelf4_joint" type="fixed">
+  <joint name="shelf2_right_joint" type="fixed">
     <parent link="body_link"/>
-    <child  link="shelf4_link"/>
-    <origin xyz="0.140 0 ${shelf3_z - body_z_offset - 0.190}" rpy="0 0 0"/>
+    <child  link="shelf2_right_link"/>
+    <origin xyz="0 ${-shelf_x_side} ${shelf2_z - body_z_offset}" rpy="0 0 0"/>
   </joint>
 
-  <!-- HEAD -->
+  <!-- Shelf 3 LEFT -->
+  <link name="shelf3_left_link">
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <box size="${shelf_length} ${shelf_width} ${shelf_thickness}"/>
+      </geometry>
+      <material name="light_grey"/>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <box size="${shelf_length} ${shelf_width} ${shelf_thickness}"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <mass value="${shelf_mass}"/>
+      <xacro:box_inertia m="${shelf_mass}" x="${shelf_length}" y="${shelf_width}" z="${shelf_thickness}"/>
+    </inertial>
+  </link>
+
+  <joint name="shelf3_left_joint" type="fixed">
+    <parent link="body_link"/>
+    <child  link="shelf3_left_link"/>
+    <origin xyz="0 ${shelf_x_side} ${shelf3_z - body_z_offset}" rpy="0 0 0"/>
+  </joint>
+
+  <!-- Shelf 3 RIGHT -->
+  <link name="shelf3_right_link">
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <box size="${shelf_length} ${shelf_width} ${shelf_thickness}"/>
+      </geometry>
+      <material name="light_grey"/>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <box size="${shelf_length} ${shelf_width} ${shelf_thickness}"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <mass value="${shelf_mass}"/>
+      <xacro:box_inertia m="${shelf_mass}" x="${shelf_length}" y="${shelf_width}" z="${shelf_thickness}"/>
+    </inertial>
+  </link>
+
+  <joint name="shelf3_right_joint" type="fixed">
+    <parent link="body_link"/>
+    <child  link="shelf3_right_link"/>
+    <origin xyz="0 ${-shelf_x_side} ${shelf3_z - body_z_offset}" rpy="0 0 0"/>
+  </joint>
+
+  <!-- ======================================================================
+       HEAD
+       ====================================================================== -->
   <link name="head_link">
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0"/>
@@ -270,7 +362,10 @@
     <origin xyz="0.020 0 ${head_z - body_z_offset}" rpy="0 0 0"/>
   </joint>
 
-  <!-- GAZEBO -->
+  <!-- ======================================================================
+       GAZEBO MATERIALS
+       ====================================================================== -->
+
   <gazebo reference="base_link">
     <material>Gazebo/DarkGrey</material>
   </gazebo>

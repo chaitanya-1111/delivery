@@ -1,0 +1,26 @@
+<?xml version="1.0"?>
+<!--
+  robot_description_pkg/urdf/materials.xacro
+  ====
+  Material definitions for RViz visualization.
+  Each material is defined ONCE in the robot description.
+  
+  IMPORTANT: These are xacro properties, not URDF <material> tags.
+  The first visual element that uses each material will define it inline.
+  Subsequent uses just reference the name.
+  ====
+-->
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <!-- Material color definitions as xacro properties -->
+  <xacro:property name="color_almost_black" value="0.10 0.10 0.10 1.0"/>
+  <xacro:property name="color_dark_grey"    value="0.25 0.25 0.25 1.0"/>
+  <xacro:property name="color_mid_grey"     value="0.50 0.50 0.50 1.0"/>
+  <xacro:property name="color_light_grey"   value="0.75 0.75 0.75 1.0"/>
+  <xacro:property name="color_white"        value="0.95 0.95 0.95 1.0"/>
+  <xacro:property name="color_green"        value="0.10 0.80 0.10 1.0"/>
+  <xacro:property name="color_blue"         value="0.10 0.10 0.80 1.0"/>
+  <xacro:property name="color_red"          value="0.80 0.10 0.10 1.0"/>
+  <xacro:property name="color_orange"       value="1.00 0.50 0.00 1.0"/>
+
+</robot>

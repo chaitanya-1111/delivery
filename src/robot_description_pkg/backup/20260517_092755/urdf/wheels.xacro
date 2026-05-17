@@ -1,0 +1,256 @@
+<?xml version="1.0"?>
+<!--
+  ============================================================================
+  robot_description_pkg/urdf/wheels.xacro
+  ====
+  PURPOSE : Defines ALL wheel links and joints for the delivery robot.
+            Separated from base.xacro to keep each file single-responsibility.
+
+  CONTENTS:
+    A) Reusable xacro macros  (drive_wheel, passive_caster)
+    B) Instantiation of:
+         • left_wheel_link  / left_wheel_joint
+         • right_wheel_link / right_wheel_joint
+         • left_caster_link  / left_caster_joint
+         • right_caster_link / right_caster_joint
+    C) Gazebo physics overrides per wheel link
+
+  DEPENDENCIES (must be included before this file in robot.urdf.xacro):
+    • inertia_macros.xacro   (cylinder_inertia, sphere_inertia)
+    • materials.xacro        (almost_black, mid_grey)
+    • base.xacro             (exposes wheel_radius, wheel_y_offset, etc.)
+
+  REP-103: SI units.  Wheel rotation axis = +Y (REP-103 §2.3).
+  ============================================================================
+-->
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <!-- ========================================================================
+       SECTION 1 – WHEEL PARAMETERS
+       Keep perfectly in sync with base.xacro.  Single source of truth is
+       base.xacro; values here are intentionally re-declared with the same
+       names so wheels.xacro is readable stand-alone in code review.
+       ======================================================================== -->
+
+  <!-- Drive wheel geometry -->
+  <xacro:property name="wheel_radius"       value="0.080"/>   <!-- m            -->
+  <xacro:property name="wheel_width"        value="0.055"/>   <!-- m (tread)    -->
+  <xacro:property name="wheel_mass"         value="1.200"/>   <!-- kg           -->
+
+  <!-- Axle position relative to base_link -->
+  <xacro:property name="wheel_x_offset"     value="0.140"/>   <!-- forward      -->
+  <xacro:property name="wheel_y_offset"     value="0.230"/>   <!-- half-track   -->
+  <xacro:property name="wheel_z_offset"     value="0.000"/>   <!-- at axle      -->
+
+  <!-- Passive caster geometry (rear, spherical) -->
+  <xacro:property name="caster_radius"      value="0.045"/>
+  <xacro:property name="caster_mass"        value="0.300"/>
+  <xacro:property name="caster_x_offset"    value="-0.175"/>
+  <xacro:property name="caster_y_offset"    value="0.140"/>
+  <!-- Z drop so caster bottom is flush with drive-wheel bottom -->
+  <xacro:property name="caster_z_offset"
+                  value="${-(wheel_radius - caster_radius)}"/>
+
+  <!-- Dynamic limits -->
+  <xacro:property name="wheel_effort_limit" value="25.0"/>    <!-- Nm           -->
+  <xacro:property name="wheel_vel_limit"    value="10.0"/>    <!-- rad/s        -->
+  <xacro:property name="wheel_damping"      value="0.05"/>
+  <xacro:property name="wheel_friction_gz"  value="1.20"/>    <!-- Gazebo mu    -->
+  <xacro:property name="caster_friction_gz" value="0.001"/>
+
+  <!-- Surface contact (Gazebo ODE) -->
+  <xacro:property name="contact_kp"         value="1000000.0"/>
+  <xacro:property name="contact_kd"         value="1.0"/>
+  <xacro:property name="contact_min_depth"  value="0.001"/>
+  <xacro:property name="contact_max_vel"    value="1.000"/>
+
+  <xacro:property name="M_PI"               value="3.14159265358979"/>
+
+  <!-- ========================================================================
+       SECTION 2 – REUSABLE MACRO: drive_wheel
+       ────────────────────────────────────────
+       Parameters:
+         prefix  – "left" or "right"
+         y_sign  – +1 (left) or -1 (right)
+
+       Instantiates:
+         ${prefix}_wheel_link
+         ${prefix}_wheel_joint   (continuous, axis +Y)
+       ======================================================================== -->
+  <xacro:macro name="drive_wheel" params="prefix y_sign">
+
+    <link name="${prefix}_wheel_link">
+      <visual>
+        <!--
+          Mesh is authored with its rotation axis along +Z.
+          We rotate π/2 about X here so the spin axis aligns with +Y
+          in the URDF frame (REP-103).
+        -->
+        <origin xyz="0 0 0" rpy="${M_PI/2} 0 0"/>
+        <geometry>
+          <mesh filename="package://robot_description_pkg/meshes/wheel.stl"
+                scale="1 1 1"/>
+        </geometry>
+        <material name="almost_black"/>
+      </visual>
+
+      <!-- Convex collision cylinder – tighter than mesh, faster physics -->
+      <collision>
+        <origin xyz="0 0 0" rpy="${M_PI/2} 0 0"/>
+        <geometry>
+          <cylinder radius="${wheel_radius}" length="${wheel_width}"/>
+        </geometry>
+        <!-- Surface properties for Gazebo ODE (mirrored in <gazebo> block) -->
+        <surface>
+          <contact>
+            <ode>
+              <kp>${contact_kp}</kp>
+              <kd>${contact_kd}</kd>
+              <min_depth>${contact_min_depth}</min_depth>
+              <max_vel>${contact_max_vel}</max_vel>
+            </ode>
+          </contact>
+          <friction>
+            <ode>
+              <mu>${wheel_friction_gz}</mu>
+              <mu2>${wheel_friction_gz}</mu2>
+              <fdir1>1 0 0</fdir1>   <!-- primary friction along forward -->
+              <slip1>0.0</slip1>
+              <slip2>0.0</slip2>
+            </ode>
+          </friction>
+        </surface>
+      </collision>
+
+      <inertial>
+        <!--
+          Hollow cylinder model (tyre + rim).
+          r_o = wheel_radius, r_i ≈ 55% of r_o (reasonable rim-to-tyre ratio).
+        -->
+        <origin xyz="0 0 0" rpy="${M_PI/2} 0 0"/>
+        <mass value="${wheel_mass}"/>
+        <xacro:hollow_cylinder_inertia
+          m="${wheel_mass}"
+          r_o="${wheel_radius}"
+          r_i="${0.55 * wheel_radius}"
+          h="${wheel_width}"/>
+      </inertial>
+    </link>
+
+    <joint name="${prefix}_wheel_joint" type="continuous">
+      <parent link="base_link"/>
+      <child  link="${prefix}_wheel_link"/>
+      <origin
+        xyz="${wheel_x_offset} ${y_sign * wheel_y_offset} ${wheel_z_offset}"
+        rpy="0 0 0"/>
+      <!-- REP-103: rotation axis = +Y for a wheel rolling forward -->
+      <axis xyz="0 1 0"/>
+      <dynamics
+        damping="${wheel_damping}"
+        friction="0.0"/>   <!-- friction here = joint friction, not contact -->
+      <limit
+        effort="${wheel_effort_limit}"
+        velocity="${wheel_vel_limit}"/>
+    </joint>
+
+    <!-- Gazebo per-link overrides (mu, material) -->
+    <gazebo reference="${prefix}_wheel_link">
+      <mu1 value="${wheel_friction_gz}"/>
+      <mu2 value="${wheel_friction_gz}"/>
+      <kp  value="${contact_kp}"/>
+      <kd  value="${contact_kd}"/>
+      <fdir1>1 0 0</fdir1>
+      <minDepth>${contact_min_depth}</minDepth>
+      <maxVel>${contact_max_vel}</maxVel>
+      <material>Gazebo/Black</material>
+    </gazebo>
+
+  </xacro:macro>
+
+  <!-- ========================================================================
+       SECTION 3 – REUSABLE MACRO: passive_caster
+       ─────────────────────────────────────────────
+       Parameters:
+         prefix  – "left" or "right"
+         y_sign  – +1 (left) or -1 (right)
+
+       Casters use a fixed joint (physics engine handles omni-directional
+       rolling via near-zero friction).  No actuation, no limits needed.
+       ======================================================================== -->
+  <xacro:macro name="passive_caster" params="prefix y_sign">
+
+    <link name="${prefix}_caster_link">
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry>
+          <sphere radius="${caster_radius}"/>
+        </geometry>
+        <material name="mid_grey"/>
+      </visual>
+
+      <collision>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry>
+          <sphere radius="${caster_radius}"/>
+        </geometry>
+        <surface>
+          <contact>
+            <ode>
+              <kp>${contact_kp}</kp>
+              <kd>${contact_kd}</kd>
+              <min_depth>${contact_min_depth}</min_depth>
+              <max_vel>${contact_max_vel}</max_vel>
+            </ode>
+          </contact>
+          <friction>
+            <ode>
+              <!-- Near-zero: caster must not resist robot turning -->
+              <mu>${caster_friction_gz}</mu>
+              <mu2>${caster_friction_gz}</mu2>
+            </ode>
+          </friction>
+        </surface>
+      </collision>
+
+      <inertial>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <mass value="${caster_mass}"/>
+        <xacro:sphere_inertia
+          m="${caster_mass}"
+          r="${caster_radius}"/>
+      </inertial>
+    </link>
+
+    <joint name="${prefix}_caster_joint" type="fixed">
+      <parent link="base_link"/>
+      <child  link="${prefix}_caster_link"/>
+      <origin
+        xyz="${caster_x_offset} ${y_sign * caster_y_offset} ${caster_z_offset}"
+        rpy="0 0 0"/>
+    </joint>
+
+    <!-- Gazebo: near-zero friction so caster doesn't create side forces -->
+    <gazebo reference="${prefix}_caster_link">
+      <mu1 value="${caster_friction_gz}"/>
+      <mu2 value="${caster_friction_gz}"/>
+      <kp  value="${contact_kp}"/>
+      <kd  value="${contact_kd}"/>
+      <material>Gazebo/Grey</material>
+    </gazebo>
+
+  </xacro:macro>
+
+  <!-- ========================================================================
+       SECTION 4 – INSTANTIATION
+       Macros called here; actual links/joints are emitted at this point.
+       ======================================================================== -->
+
+  <!-- Drive wheels -->
+  <xacro:drive_wheel  prefix="left"  y_sign="1"/>
+  <xacro:drive_wheel  prefix="right" y_sign="-1"/>
+
+  <!-- Passive rear casters -->
+  <xacro:passive_caster prefix="left"  y_sign="1"/>
+  <xacro:passive_caster prefix="right" y_sign="-1"/>
+
+</robot>

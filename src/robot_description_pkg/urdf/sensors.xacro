@@ -1,112 +1,32 @@
 <?xml version="1.0"?>
 <!--
-  ============================================================================
   robot_description_pkg/urdf/sensors.xacro
-  ============================================================================
-  PURPOSE : Defines every sensor frame on the delivery robot.
-            Links here are zero-inertia mounting frames only.
-            Physical sensor mass is lumped into the parent structural link
-            (body_link / head_link / base_link) to avoid micro-link
-            instability in the physics engine.
-
-  SENSORS DEFINED:
-    1. 2-D LiDAR         → lidar_link
-                            parent: body_link  (upper column, ~840 mm AGL)
-    2. Depth Camera      → camera_link
-                         → camera_optical_link   (REP-103 optical convention)
-                            parent: head_link  (display face, ~1080 mm AGL)
-    3. IMU               → imu_link
-                            parent: base_link  (chassis CoM)
-    4. Ultrasonic array  → ultrasonic_{front,left,right,rear}_link   [×4]
-                            parent: base_link  (bumper ring, 200 mm AGL)
-
-  FRAME CONVENTIONS (REP-103):
-    body   frames : x-forward, y-left,  z-up
-    optical frame : x-right,   y-down,  z-forward  (camera_optical_link)
-      → achieved by rpy="-π/2  0  -π/2" relative to camera_link
-
-  DEPENDENCIES (included before this file in robot.urdf.xacro):
-    • inertia_macros.xacro
-    • materials.xacro
-    • base.xacro             (body_link, head_link, base_link must exist)
-
-  NOTE ON MASS:
-    Sensor frame links have mass=0.001 kg and near-zero inertia.
-    This is intentional: real mass is already on the parent structural link.
-    Using exactly 0 causes Gazebo warnings; 0.001 is the accepted floor.
-  ============================================================================
+  All sensor frames: LiDAR (10cm above base), camera, IMU, ultrasonics
 -->
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro">
 
-  <!-- ========================================================================
-       SECTION 1 – SENSOR PLACEMENT PARAMETERS
-       ======================================================================== -->
-
-  <!-- ── Body column geometry (mirror from base.xacro) ── -->
+  <!-- PARAMETERS -->
   <xacro:property name="chassis_height"      value="0.180"/>
   <xacro:property name="body_height"         value="0.820"/>
-  <xacro:property name="body_z_offset"
-    value="${chassis_height / 2.0 + body_height / 2.0}"/>
+  <xacro:property name="body_z_offset"       value="${chassis_height / 2.0 + body_height / 2.0}"/>
 
-  <!-- ── LiDAR (2-D, upper body column) ── -->
-  <!--
-    Target AGL (above ground level):
-      base_link is at wheel_radius = 0.080 m above ground.
-      body_link origin is at body_z_offset = 0.090 + 0.410 = 0.500 m above base_link.
-      lidar_z_from_body = 0.520  →  AGL = 0.080 + 0.500 + 0.520 = 1.100 m ✓
-  -->
-  <xacro:property name="lidar_z_from_body"   value="0.520"/>   <!-- rel. body_link  -->
-  <xacro:property name="lidar_x_from_body"   value="0.065"/>   <!-- forward of col. -->
-  <xacro:property name="lidar_visual_r"      value="0.037"/>   <!-- puck radius     -->
-  <xacro:property name="lidar_visual_h"      value="0.038"/>   <!-- puck height     -->
+  <xacro:property name="lidar_visual_r"      value="0.037"/>
+  <xacro:property name="lidar_visual_h"      value="0.038"/>
 
-  <!-- ── Depth Camera (head face) ── -->
   <xacro:property name="head_length"         value="0.070"/>
   <xacro:property name="camera_x_from_head"  value="${head_length / 2.0}"/>
   <xacro:property name="camera_z_from_head"  value="0.010"/>
 
-  <!-- ── Ultrasonic sensors (4-point bumper ring, 200 mm AGL) ── -->
-  <!--
-    AGL = wheel_radius (0.080) + ultrasonic_z_from_base (0.120) = 0.200 m
-  -->
   <xacro:property name="ultrasonic_z_from_base" value="0.120"/>
-  <xacro:property name="ultrasonic_fwd_x"       value="0.255"/>   <!-- front -->
-  <xacro:property name="ultrasonic_side_x"       value="0.000"/>   <!-- side  -->
-  <xacro:property name="ultrasonic_side_y"       value="0.210"/>   <!-- side  -->
-  <xacro:property name="ultrasonic_rear_x"       value="-0.255"/>  <!-- rear  -->
+  <xacro:property name="ultrasonic_fwd_x"       value="0.255"/>
+  <xacro:property name="ultrasonic_side_x"      value="0.000"/>
+  <xacro:property name="ultrasonic_side_y"      value="0.210"/>
+  <xacro:property name="ultrasonic_rear_x"      value="-0.255"/>
 
-  <!-- ── Shared sensor frame mass floor (Gazebo requires > 0) ── -->
   <xacro:property name="sensor_frame_mass"   value="0.001"/>
-
   <xacro:property name="M_PI" value="3.14159265358979"/>
 
-  <!-- ========================================================================
-       SECTION 2 – REUSABLE MACRO: sensor_frame
-       Creates a minimal massless link suitable for any sensor origin.
-       Parameters:
-         name          – link name
-         visual_shape  – "none" | "box" | "cylinder" | "sphere"
-         vis_*         – geometry dimensions (only used if not "none")
-         mat           – material name from materials.xacro
-       ======================================================================== -->
-  <xacro:macro name="sensor_frame" params="name">
-    <link name="${name}">
-      <inertial>
-        <origin xyz="0 0 0" rpy="0 0 0"/>
-        <mass value="${sensor_frame_mass}"/>
-        <!-- Near-zero inertia box; avoids division-by-zero in ODE -->
-        <inertia ixx="1e-7" ixy="0" ixz="0"
-                             iyy="1e-7" iyz="0"
-                                         izz="1e-7"/>
-      </inertial>
-    </link>
-  </xacro:macro>
-
-  <!-- ========================================================================
-       SECTION 3 – 2-D LiDAR FRAME
-       ======================================================================== -->
-
-  <!-- Visual representation link (for RViz clarity) -->
+  <!-- LIDAR (10cm above base_link = 18cm from ground) -->
   <link name="lidar_link">
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0"/>
@@ -124,41 +44,26 @@
     <inertial>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <mass value="${sensor_frame_mass}"/>
-      <inertia ixx="1e-7" ixy="0" ixz="0"
-                           iyy="1e-7" iyz="0"
-                                       izz="1e-7"/>
+      <inertia ixx="1e-7" ixy="0" ixz="0" iyy="1e-7" iyz="0" izz="1e-7"/>
     </inertial>
   </link>
 
   <joint name="lidar_joint" type="fixed">
-    <parent link="body_link"/>
+    <parent link="base_link"/>
     <child  link="lidar_link"/>
-    <!--
-      Origin relative to body_link.
-      x: forward on column face
-      z: lidar_z_from_body up the column
-      No rotation: scan plane = XY plane (REP-103 compliant).
-    -->
-    <origin xyz="${lidar_x_from_body} 0 ${lidar_z_from_body}" rpy="0 0 0"/>
+    <!-- 10cm (0.100m) above base_link -->
+    <origin xyz="0.065 0 0.100" rpy="0 0 0"/>
   </joint>
 
-  <!-- Gazebo sensor visual material -->
   <gazebo reference="lidar_link">
     <material>Gazebo/Black</material>
   </gazebo>
 
-  <!-- ========================================================================
-       SECTION 4 – DEPTH CAMERA FRAMES
-       Two frames are required by the ROS image pipeline:
-         camera_link        – body frame  (x-fwd, y-left, z-up)
-         camera_optical_link – optical frame (x-right, y-down, z-fwd)
-       ======================================================================== -->
-
+  <!-- DEPTH CAMERA (on head) -->
   <link name="camera_link">
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
-        <!-- D435i physical envelope: 90 mm × 25 mm × 25 mm -->
         <box size="0.025 0.090 0.025"/>
       </geometry>
       <material name="almost_black"/>
@@ -172,41 +77,22 @@
     <inertial>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <mass value="${sensor_frame_mass}"/>
-      <inertia ixx="1e-7" ixy="0" ixz="0"
-                           iyy="1e-7" iyz="0"
-                                       izz="1e-7"/>
+      <inertia ixx="1e-7" ixy="0" ixz="0" iyy="1e-7" iyz="0" izz="1e-7"/>
     </inertial>
   </link>
 
   <joint name="camera_joint" type="fixed">
     <parent link="head_link"/>
     <child  link="camera_link"/>
-    <!--
-      Camera body frame:
-        x = ${camera_x_from_head}  →  flush with front face of head
-        z = ${camera_z_from_head}  →  slightly above head centre
-    -->
     <origin xyz="${camera_x_from_head} 0 ${camera_z_from_head}" rpy="0 0 0"/>
   </joint>
 
-  <!--
-    Optical frame (REP-103 §4.4):
-      camera_link is x-fwd, y-left, z-up  (robot body convention)
-      camera_optical_link must be x-right, y-down, z-fwd  (optical convention)
-      Rotation: rpy = (-π/2, 0, -π/2)
-                 R_x(-90°) followed by R_z(-90°)
-    Required by:
-      • image_transport / rviz  (PointCloud2, depth image display)
-      • cv_bridge               (correct image orientation)
-      • RealSense ROS wrapper   (frame_id in CameraInfo)
-  -->
+  <!-- Camera optical frame (z-forward, x-right, y-down) -->
   <link name="camera_optical_link">
     <inertial>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <mass value="${sensor_frame_mass}"/>
-      <inertia ixx="1e-7" ixy="0" ixz="0"
-                           iyy="1e-7" iyz="0"
-                                       izz="1e-7"/>
+      <inertia ixx="1e-7" ixy="0" ixz="0" iyy="1e-7" iyz="0" izz="1e-7"/>
     </inertial>
   </link>
 
@@ -216,20 +102,15 @@
     <origin xyz="0 0 0" rpy="${-M_PI/2} 0 ${-M_PI/2}"/>
   </joint>
 
-  <!-- Gazebo visual -->
   <gazebo reference="camera_link">
     <material>Gazebo/Black</material>
   </gazebo>
 
-  <!-- ========================================================================
-       SECTION 5 – IMU FRAME
-       ======================================================================== -->
-
+  <!-- IMU (chassis center) -->
   <link name="imu_link">
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
-        <!-- Physical footprint of a typical IMU breakout (20×20×4 mm) -->
         <box size="0.020 0.020 0.004"/>
       </geometry>
       <material name="green"/>
@@ -237,21 +118,13 @@
     <inertial>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <mass value="${sensor_frame_mass}"/>
-      <inertia ixx="1e-7" ixy="0" ixz="0"
-                           iyy="1e-7" iyz="0"
-                                       izz="1e-7"/>
+      <inertia ixx="1e-7" ixy="0" ixz="0" iyy="1e-7" iyz="0" izz="1e-7"/>
     </inertial>
   </link>
 
   <joint name="imu_joint" type="fixed">
     <parent link="base_link"/>
     <child  link="imu_link"/>
-    <!--
-      Centred on base_link origin (geometric centre of chassis, at axle height).
-      Zero rotation: IMU axes aligned with robot body axes.
-      If your physical IMU is rotated on the PCB, add rpy here
-      so tf is correct — do NOT correct in software.
-    -->
     <origin xyz="0 0 0" rpy="0 0 0"/>
   </joint>
 
@@ -259,21 +132,12 @@
     <material>Gazebo/Green</material>
   </gazebo>
 
-  <!-- ========================================================================
-       SECTION 6 – ULTRASONIC SENSOR ARRAY  (4 × HC-SR04 / similar)
-       Used for close-range obstacle detection / emergency stop.
-       Each link is a zero-inertia frame; Gazebo ray sensors attach in
-       gazebo_plugins.xacro.
-       ======================================================================== -->
-
-  <!-- ── Macro: ultrasonic_sensor ── -->
+  <!-- ULTRASONIC ARRAY (4 sensors) -->
   <xacro:macro name="ultrasonic_sensor" params="name parent_link xyz rpy">
-
     <link name="${name}_link">
       <visual>
         <origin xyz="0 0 0" rpy="0 0 0"/>
         <geometry>
-          <!-- Sensor face: 16 mm dia, 12 mm depth -->
           <cylinder radius="0.008" length="0.012"/>
         </geometry>
         <material name="mid_grey"/>
@@ -281,9 +145,7 @@
       <inertial>
         <origin xyz="0 0 0" rpy="0 0 0"/>
         <mass value="${sensor_frame_mass}"/>
-        <inertia ixx="1e-7" ixy="0" ixz="0"
-                             iyy="1e-7" iyz="0"
-                                         izz="1e-7"/>
+        <inertia ixx="1e-7" ixy="0" ixz="0" iyy="1e-7" iyz="0" izz="1e-7"/>
       </inertial>
     </link>
 
@@ -296,35 +158,18 @@
     <gazebo reference="${name}_link">
       <material>Gazebo/Grey</material>
     </gazebo>
-
   </xacro:macro>
 
-  <!-- ── Front ultrasonic (faces forward, no pitch/yaw needed) ── -->
-  <xacro:ultrasonic_sensor
-    name="ultrasonic_front"
-    parent_link="base_link"
-    xyz="${ultrasonic_fwd_x} 0 ${ultrasonic_z_from_base}"
-    rpy="0 0 0"/>
+  <xacro:ultrasonic_sensor name="ultrasonic_front" parent_link="base_link"
+    xyz="${ultrasonic_fwd_x} 0 ${ultrasonic_z_from_base}" rpy="0 0 0"/>
 
-  <!-- ── Left ultrasonic (faces +Y, yaw = +90°) ── -->
-  <xacro:ultrasonic_sensor
-    name="ultrasonic_left"
-    parent_link="base_link"
-    xyz="${ultrasonic_side_x} ${ultrasonic_side_y} ${ultrasonic_z_from_base}"
-    rpy="0 0 ${M_PI/2}"/>
+  <xacro:ultrasonic_sensor name="ultrasonic_left" parent_link="base_link"
+    xyz="${ultrasonic_side_x} ${ultrasonic_side_y} ${ultrasonic_z_from_base}" rpy="0 0 ${M_PI/2}"/>
 
-  <!-- ── Right ultrasonic (faces -Y, yaw = -90°) ── -->
-  <xacro:ultrasonic_sensor
-    name="ultrasonic_right"
-    parent_link="base_link"
-    xyz="${ultrasonic_side_x} ${-ultrasonic_side_y} ${ultrasonic_z_from_base}"
-    rpy="0 0 ${-M_PI/2}"/>
+  <xacro:ultrasonic_sensor name="ultrasonic_right" parent_link="base_link"
+    xyz="${ultrasonic_side_x} ${-ultrasonic_side_y} ${ultrasonic_z_from_base}" rpy="0 0 ${-M_PI/2}"/>
 
-  <!-- ── Rear ultrasonic (faces -X, yaw = 180°) ── -->
-  <xacro:ultrasonic_sensor
-    name="ultrasonic_rear"
-    parent_link="base_link"
-    xyz="${ultrasonic_rear_x} 0 ${ultrasonic_z_from_base}"
-    rpy="0 0 ${M_PI}"/>
+  <xacro:ultrasonic_sensor name="ultrasonic_rear" parent_link="base_link"
+    xyz="${ultrasonic_rear_x} 0 ${ultrasonic_z_from_base}" rpy="0 0 ${M_PI}"/>
 
 </robot>
