@@ -1,5 +1,55 @@
 # Gazebo Simulation - Quick Start Guide
 
+## Why use Gazebo?
+
+Gazebo is a **digital test bench** for this delivery robot—not a machine-learning trainer.
+
+| What people sometimes call "train" | In this workspace |
+|-----------------------------------|-------------------|
+| ML / reinforcement learning (neural net learns in sim) | **No** — no gym, PyTorch, or training scripts |
+| Test teleop, Nav2, SLAM safely without hardware | **Yes** |
+| Calibrate wheels, lidar mount, Nav2, SLAM | **Yes** — you edit config files manually after observing behavior |
+
+Reasons to use simulation here:
+
+1. **No risk to hardware** — bad `/cmd_vel` or Nav2 goals cannot damage motors or furniture.
+2. **Same ROS interfaces as the real robot** — Gazebo diff-drive uses `/cmd_vel` and `/odom` (see `src/robot_description_pkg/gazebo/gazebo_plugins.xacro`), matching `robot_hardware_pkg`.
+3. **Validate URDF and sensors** — meshes, wheel separation, LiDAR pose, and plugin topics before deploy.
+4. **Develop navigation faster** — optional SLAM/Nav2 against simulated `/scan` and `/odom`.
+5. **Repeatable tests** — fixed spawn via `gazebo_bringup.launch.py` args (`x`, `y`, `yaw`).
+
+Related guides: [ROBOT_MOVEMENT_GUIDE.md](ROBOT_MOVEMENT_GUIDE.md) (teleop), [src/README.md](src/README.md) (calibration file locations).
+
+---
+
+## What changes in your files?
+
+**Default: nothing in `src/` changes automatically.** Launching Gazebo only starts processes and publishes topics in memory.
+
+| Activity in Gazebo | Files that might change | Who changes them |
+|--------------------|-------------------------|------------------|
+| Drive with teleop / `ros2 topic pub` | None | — |
+| Save a ROS bag | New `.db3` bag folder (often outside `src/`) | You run `ros2 bag record` |
+| Build a map with SLAM | New `map.yaml` + `map.pgm` | SLAM toolbox save |
+| Tune sim physics | `src/robot_description_pkg/gazebo/gazebo_plugins.xacro` | You edit manually |
+| Tune real odometry | `src/robot_hardware_pkg/robot_hardware_pkg/hardware_interface_node.py` | You edit manually |
+| Tune lidar mount | `src/robot_lidar_pkg/robot_lidar_pkg/lidar_tf_node.py` or launch args | You edit manually |
+| Tune Nav2 | `src/robot_navigation_pkg/config/nav2_params.yaml` | You edit manually |
+| Tune SLAM | `src/robot_slam_pkg/config/slam_toolbox_mapping.yaml` | You edit manually |
+| Change robot shape | `src/robot_description_pkg/urdf/*.xacro`, `meshes/*.stl` | You edit + `colcon build` |
+
+**Simulation setup files** (do not auto-update when you drive the robot):
+
+- `src/robot_description_pkg/launch/gazebo_bringup.launch.py`
+- `src/robot_description_pkg/gazebo/gazebo_plugins.xacro`
+- `gazebo_launch.sh`, `robot_teleop.py`
+
+**Runtime-only** (not source): `~/.gazebo/` cache, `build/`, `install/`, `log/`, optional bags/maps.
+
+**ML training in Gazebo** is not part of this repo. Adding it would mean new packages (e.g. gym + ROS bridge) and checkpoint files—not automatic edits to existing navigation/URDF files.
+
+---
+
 ## Build & Setup
 
 ### 1. Build the workspace
@@ -108,11 +158,9 @@ sudo apt-get install ros-iron-gazebo-ros
 
 ---
 
-## Next Steps: Regarding "movlet"
+## Next steps
 
-Please clarify what you mean by "movlet":
-- **MoveIt!** - Motion planning for manipulators/arms? (requires separate setup)
-- **Custom teleop tool** - Want me to create a simple GUI controller?
-- **Something else** - Let me know!
-
-Once clarified, I can help you integrate it with the Gazebo simulation.
+- **Keyboard control:** see [ROBOT_MOVEMENT_GUIDE.md](ROBOT_MOVEMENT_GUIDE.md) (`python3 robot_teleop.py`).
+- **Autonomous navigation:** after a saved map, use `robot_navigation_pkg` launches (see that package README).
+- **Calibration on hardware:** follow the order in [src/README.md](src/README.md) (lidar TF → wheel odometry → SLAM/Nav2).
+- **MoveIt! / manipulator planning:** not included; this robot is differential-drive mobile base only.

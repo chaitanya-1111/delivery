@@ -42,6 +42,8 @@ If you want to calibrate the robot quickly, these are the main files:
 
 Recommended order: calibrate lidar TF first, then wheel/encoder odometry, then tune SLAM/Nav2.
 
+You can practice teleop and compare `/odom` behavior in **Gazebo** before hardware; that does not auto-edit these files—you change constants manually after tests. See [GAZEBO_SETUP.md](../GAZEBO_SETUP.md) (simulation is not ML training in this workspace).
+
 ## Quick launch
 
 ```bash

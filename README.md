@@ -57,6 +57,14 @@ ros2 launch robot_hardware_pkg hardware_bringup.launch.py
 
 Common arguments: `mock_mode:=true`, `serial_port:=/dev/ttyACM0`, `use_rviz:=true`. See that package’s README for details.
 
+### Gazebo simulation (test bench, not ML training)
+
+```bash
+ros2 launch robot_description_pkg gazebo_bringup.launch.py
+```
+
+See [GAZEBO_SETUP.md](GAZEBO_SETUP.md) for why to use Gazebo, what files change (by default: none in `src/`), and troubleshooting. Teleop: [ROBOT_MOVEMENT_GUIDE.md](ROBOT_MOVEMENT_GUIDE.md).
+
 ## Architecture (high level)
 
 1. **Vision**: `/camera/image_raw` → face detector → `/face/primary`, `/face/present` → tracker → `/face/target` → servo node (pan/tilt; simulation logs on WSL).
